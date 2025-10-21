@@ -31,10 +31,10 @@ export function OrganizationsPage() {
     clearError();
     try {
       const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-      await createOrganization({ 
-        name: name.trim(), 
+      await createOrganization({
+        name: name.trim(),
         slug: slug,
-        description: description.trim() || undefined 
+        description: description.trim() || undefined
       });
       setName('');
       setDescription('');
@@ -47,8 +47,8 @@ export function OrganizationsPage() {
     <div className="space-y-8 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">Organizations</h1>
-          <p className="text-gray-400 mt-1">Create and manage your organizations</p>
+          <h1 className="text-2xl font-bold text-white">Organizations</h1>
+          <p className="text-gray-400 text-sm mt-1">Create and manage your organizations</p>
         </div>
         <div className="text-sm text-gray-400">
           {organizations.length} organization{organizations.length !== 1 ? 's' : ''}
@@ -85,7 +85,7 @@ export function OrganizationsPage() {
                 onChange={(e) => setDescription(e.target.value)}
               />
             </div>
-            
+
             {error && (
               <div className="bg-red-900/20 border border-red-500/20 rounded-lg p-4">
                 <div className="flex items-center">
@@ -96,7 +96,7 @@ export function OrganizationsPage() {
                 </div>
               </div>
             )}
-            
+
             <div className="flex justify-end">
               <Button
                 type="submit"

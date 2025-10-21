@@ -104,7 +104,8 @@ export interface Secret {
   name: string;
   description?: string;
   type: SecretType;
-  environment?: string;
+  environment: string;
+  folder: string;
   value: string; // This will be masked unless includeValues is true
   maskedValue: string;
   projectId: string;
@@ -130,7 +131,8 @@ export interface CreateSecretRequest {
   name: string;
   description?: string;
   type: SecretType;
-  environment?: string;
+  environment: string;
+  folder: string;
   value: string;
 }
 
@@ -139,6 +141,7 @@ export interface UpdateSecretRequest {
   description?: string;
   type?: SecretType;
   environment?: string;
+  folder?: string;
   value?: string;
 }
 

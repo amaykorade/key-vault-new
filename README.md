@@ -1,4 +1,4 @@
-# Key Vault 🔐
+   # Key Vault 🔐
 
 A modern, secure secret management application built with React, TypeScript, Node.js, and PostgreSQL.
 

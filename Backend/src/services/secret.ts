@@ -1,6 +1,7 @@
 import { db } from '../lib/db';
 import { z } from 'zod';
 import { encryptSecret, decryptSecret, maskSecret } from '../lib/encryption';
+import { AccessControlService } from './access-control';
 
 export const SecretSchema = {
   create: z.object({
@@ -8,6 +9,7 @@ export const SecretSchema = {
     description: z.string().max(500, 'Description too long').optional(),
     type: z.enum(['API_KEY', 'DATABASE_URL', 'JWT_SECRET', 'OAUTH_CLIENT_SECRET', 'WEBHOOK_SECRET', 'SSH_KEY', 'CERTIFICATE', 'PASSWORD', 'OTHER']).default('API_KEY'),
     environment: z.string().min(1, 'Environment is required').max(50, 'Environment name too long').default('development'),
+    folder: z.string().max(50, 'Folder name too long').default('default'),
     value: z.string().min(1, 'Secret value is required'),
   }),
   update: z.object({
@@ -15,6 +17,7 @@ export const SecretSchema = {
     description: z.string().max(500, 'Description too long').optional(),
     type: z.enum(['API_KEY', 'DATABASE_URL', 'JWT_SECRET', 'OAUTH_CLIENT_SECRET', 'WEBHOOK_SECRET', 'SSH_KEY', 'CERTIFICATE', 'PASSWORD', 'OTHER']).optional(),
     environment: z.string().min(1, 'Environment is required').max(50, 'Environment name too long').optional(),
+    folder: z.string().max(50, 'Folder name too long').optional(),
     value: z.string().min(1, 'Secret value is required').optional(),
   }),
 };
@@ -22,38 +25,24 @@ export const SecretSchema = {
 export class SecretService {
   // Create secret in project
   static async createSecret(projectId: string, userId: string, data: z.infer<typeof SecretSchema.create>) {
-    // Check if user has access to project's organization
-    const project = await db.project.findFirst({
-      where: {
-        id: projectId,
-        organization: {
-          memberships: {
-            some: {
-              userId,
-              role: {
-                in: ['OWNER', 'ADMIN', 'MEMBER'],
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!project) {
-      throw new Error('Access denied');
+    // Check if user has write access to this project
+    const canWrite = await AccessControlService.canWrite(userId, projectId);
+    if (!canWrite) {
+      throw new Error('Access denied: You need WRITE permission to create secrets');
     }
 
-    // Check if secret name already exists in project for the same environment
+    // Check if secret name already exists in project for the same environment and folder
     const existingSecret = await db.secret.findFirst({
       where: {
         projectId,
         name: data.name,
         environment: data.environment,
+        folder: data.folder,
       },
     });
 
     if (existingSecret) {
-      throw new Error(`Secret with name "${data.name}" already exists in this project for environment "${data.environment}"`);
+      throw new Error(`Secret with name "${data.name}" already exists in this project for environment "${data.environment}" and folder "${data.folder}"`);
     }
 
     // Encrypt the secret value
@@ -65,6 +54,7 @@ export class SecretService {
         description: data.description,
         type: data.type,
         environment: data.environment,
+        folder: data.folder,
         value: encryptedValue,
         projectId,
         createdById: userId,
@@ -74,22 +64,10 @@ export class SecretService {
 
   // Get secrets in project
   static async getProjectSecrets(projectId: string, userId: string, includeValues: boolean = false) {
-    // Check if user has access to project's organization
-    const project = await db.project.findFirst({
-      where: {
-        id: projectId,
-        organization: {
-          memberships: {
-            some: {
-              userId,
-            },
-          },
-        },
-      },
-    });
-
-    if (!project) {
-      throw new Error('Access denied');
+    // Check if user has read access to this project
+    const canRead = await AccessControlService.canRead(userId, projectId);
+    if (!canRead) {
+      throw new Error('Access denied: You need READ permission to view secrets');
     }
 
     const secrets = await db.secret.findMany({
@@ -120,19 +98,8 @@ export class SecretService {
 
   // Get specific secret
   static async getSecretById(secretId: string, userId: string, includeValue: boolean = false) {
-    const secret = await db.secret.findFirst({
-      where: {
-        id: secretId,
-        project: {
-          organization: {
-            memberships: {
-              some: {
-                userId,
-              },
-            },
-          },
-        },
-      },
+    const secret = await db.secret.findUnique({
+      where: { id: secretId },
       include: {
         project: {
           select: {
@@ -161,6 +128,12 @@ export class SecretService {
       return null;
     }
 
+    // Check if user has read access to this project
+    const canRead = await AccessControlService.canRead(userId, secret.projectId);
+    if (!canRead) {
+      throw new Error('Access denied: You need READ permission to view this secret');
+    }
+
     return {
       ...secret,
       value: includeValue ? decryptSecret(secret.value) : maskSecret(decryptSecret(secret.value)),
@@ -170,27 +143,25 @@ export class SecretService {
 
   // Update secret (only members with write access)
   static async updateSecret(secretId: string, userId: string, data: z.infer<typeof SecretSchema.update>) {
-    // Check if user has access to secret's project organization
-    const secret = await db.secret.findFirst({
-      where: {
-        id: secretId,
-        project: {
-          organization: {
-            memberships: {
-              some: {
-                userId,
-                role: {
-                  in: ['OWNER', 'ADMIN', 'MEMBER'],
-                },
-              },
-            },
-          },
-        },
+    // Get the secret with all fields we need
+    const secret = await db.secret.findUnique({
+      where: { id: secretId },
+      select: { 
+        projectId: true,
+        name: true,
+        environment: true,
+        folder: true,
       },
     });
 
     if (!secret) {
-      throw new Error('Access denied');
+      throw new Error('Secret not found');
+    }
+
+    // Check if user has write access to this project
+    const canWrite = await AccessControlService.canWrite(userId, secret.projectId);
+    if (!canWrite) {
+      throw new Error('Access denied: You need WRITE permission to update secrets');
     }
 
     // Check if new name conflicts with existing secret (if name is being updated)
@@ -200,6 +171,7 @@ export class SecretService {
           projectId: secret.projectId,
           name: data.name,
           environment: data.environment || secret.environment,
+          folder: data.folder || secret.folder,
           id: {
             not: secretId,
           },
@@ -207,7 +179,7 @@ export class SecretService {
       });
 
       if (existingSecret) {
-        throw new Error(`Secret with name "${data.name}" already exists in this project for environment "${data.environment || secret.environment}"`);
+        throw new Error(`Secret with name "${data.name}" already exists in this project for environment "${data.environment || secret.environment}" and folder "${data.folder || secret.folder}"`);
       }
     }
 
@@ -230,29 +202,22 @@ export class SecretService {
     });
   }
 
-  // Delete secret (only members with write access)
+  // Delete secret (only members with delete access)
   static async deleteSecret(secretId: string, userId: string) {
-    // Check if user has write access to secret's project organization
-    const secret = await db.secret.findFirst({
-      where: {
-        id: secretId,
-        project: {
-          organization: {
-            memberships: {
-              some: {
-                userId,
-                role: {
-                  in: ['OWNER', 'ADMIN', 'MEMBER'],
-                },
-              },
-            },
-          },
-        },
-      },
+    // Get the secret to find its project
+    const secret = await db.secret.findUnique({
+      where: { id: secretId },
+      select: { projectId: true },
     });
 
     if (!secret) {
-      throw new Error('Access denied');
+      throw new Error('Secret not found');
+    }
+
+    // Check if user has delete access to this project
+    const canDelete = await AccessControlService.canDelete(userId, secret.projectId);
+    if (!canDelete) {
+      throw new Error('Access denied: You need DELETE permission (ADMIN or OWNER role)');
     }
 
     return await db.secret.delete({
@@ -260,18 +225,20 @@ export class SecretService {
     });
   }
 
-  // Get user's secrets across all projects
+  // Get user's secrets across all projects they have access to
   static async getUserSecrets(userId: string, includeValues: boolean = false) {
+    // Get all projects user has access to
+    const userProjects = await AccessControlService.getUserProjects(userId);
+    const projectIds = userProjects.map((p: any) => p.id);
+
+    if (projectIds.length === 0) {
+      return [];
+    }
+
     const secrets = await db.secret.findMany({
       where: {
-        project: {
-          organization: {
-            memberships: {
-              some: {
-                userId,
-              },
-            },
-          },
+        projectId: {
+          in: projectIds,
         },
       },
       include: {
@@ -311,15 +278,17 @@ export class SecretService {
 
   // Search secrets by name or description
   static async searchSecrets(userId: string, query: string, projectId?: string) {
+    // Get all projects user has access to
+    const userProjects = await AccessControlService.getUserProjects(userId);
+    const projectIds = userProjects.map((p: any) => p.id);
+
+    if (projectIds.length === 0) {
+      return [];
+    }
+
     const whereClause: any = {
-      project: {
-        organization: {
-          memberships: {
-            some: {
-              userId,
-            },
-          },
-        },
+      projectId: {
+        in: projectId ? [projectId] : projectIds,
       },
       OR: [
         {
@@ -337,8 +306,9 @@ export class SecretService {
       ],
     };
 
-    if (projectId) {
-      whereClause.projectId = projectId;
+    // If specific projectId requested, verify user has access
+    if (projectId && !projectIds.includes(projectId)) {
+      throw new Error('Access denied: You do not have access to this project');
     }
 
     const secrets = await db.secret.findMany({
@@ -380,22 +350,10 @@ export class SecretService {
 
   // Get secrets by type
   static async getSecretsByType(projectId: string, userId: string, type: string) {
-    // Check if user has access to project's organization
-    const project = await db.project.findFirst({
-      where: {
-        id: projectId,
-        organization: {
-          memberships: {
-            some: {
-              userId,
-            },
-          },
-        },
-      },
-    });
-
-    if (!project) {
-      throw new Error('Access denied');
+    // Check if user has read access to this project
+    const canRead = await AccessControlService.canRead(userId, projectId);
+    if (!canRead) {
+      throw new Error('Access denied: You need READ permission to view secrets');
     }
 
     const secrets = await db.secret.findMany({

@@ -53,7 +53,7 @@ export function Sidebar() {
   }, [showUserMenu]);
 
   return (
-    <aside className={`hidden lg:block ${collapsed ? 'w-16' : 'w-64'} transition-all duration-300 bg-gray-900/50 backdrop-blur-sm min-h-screen border-r border-gray-800 flex flex-col`}>
+    <aside className={`hidden lg:block ${collapsed ? 'w-16' : 'w-64'} transition-all duration-300 bg-gray-900/50 backdrop-blur-sm h-screen sticky top-0 border-r border-gray-800 flex flex-col overflow-y-auto`}>
       {/* Brand/Logo Section */}
       <div className="p-4 border-b border-gray-800">
         <div className="flex items-center justify-between">

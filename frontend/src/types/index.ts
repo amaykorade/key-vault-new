@@ -1,5 +1,6 @@
 // Role types
 export type Role = 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
+export type TeamRole = 'LEAD' | 'MEMBER';
 
 // User types
 export interface User {
@@ -62,6 +63,8 @@ export interface UpdateOrganizationRequest {
 }
 
 // Project types
+export type ProjectRole = 'OWNER' | 'ADMIN' | 'WRITE' | 'READ';
+
 export interface Project {
   id: string;
   name: string;
@@ -72,8 +75,29 @@ export interface Project {
     name: string;
     slug: string;
   };
+  userRole?: ProjectRole | null;
+  userAccess?: {
+    canRead: boolean;
+    canWrite: boolean;
+    canDelete: boolean;
+    canManageMembers: boolean;
+    canManageProject: boolean;
+  };
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProjectMember {
+  id: string;
+  user: {
+    id: string;
+    name?: string;
+    email: string;
+    image?: string;
+  };
+  role: ProjectRole;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export interface CreateProjectRequest {
@@ -84,6 +108,15 @@ export interface CreateProjectRequest {
 export interface UpdateProjectRequest {
   name?: string;
   description?: string;
+}
+
+export interface AddProjectMemberRequest {
+  userId: string;
+  role: ProjectRole;
+}
+
+export interface UpdateProjectMemberRoleRequest {
+  role: ProjectRole;
 }
 
 // Secret types
@@ -106,6 +139,8 @@ export interface Secret {
   value: string; // This will be masked unless includeValues is true
   maskedValue: string;
   projectId: string;
+  environment: string;
+  folder: string;
   project?: {
     id: string;
     name: string;
@@ -128,6 +163,8 @@ export interface CreateSecretRequest {
   name: string;
   description?: string;
   type: SecretType;
+  environment: string;
+  folder: string;
   value: string;
 }
 
@@ -135,6 +172,8 @@ export interface UpdateSecretRequest {
   name?: string;
   description?: string;
   type?: SecretType;
+  environment?: string;
+  folder?: string;
   value?: string;
 }
 
@@ -187,4 +226,186 @@ export interface ProjectSearchParams {
 
 export interface OrganizationSearchParams {
   search?: string;
+}
+
+// Team types
+export interface Team {
+  id: string;
+  name: string;
+  description?: string;
+  organizationId: string;
+  createdBy: {
+    id: string;
+    name?: string;
+    email: string;
+    image?: string;
+  };
+  organization?: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  members?: TeamMember[];
+  memberCount: number;
+  userRole?: TeamRole | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TeamMember {
+  id: string;
+  user: {
+    id: string;
+    name?: string;
+    email: string;
+    image?: string;
+  };
+  role: TeamRole;
+  joinedAt: string;
+}
+
+export interface CreateTeamRequest {
+  name: string;
+  description?: string;
+}
+
+export interface UpdateTeamRequest {
+  name?: string;
+  description?: string;
+}
+
+export interface AddTeamMemberRequest {
+  userId: string;
+  role: TeamRole;
+}
+
+export interface UpdateTeamMemberRoleRequest {
+  role: TeamRole;
+}
+
+export interface UserTeam {
+  id: string;
+  role: TeamRole;
+  joinedAt: string;
+  team: {
+    id: string;
+    name: string;
+    description?: string;
+    organizationId: string;
+    organization: {
+      id: string;
+      name: string;
+      slug: string;
+    };
+    memberCount: number;
+    createdAt: string;
+  };
+}
+
+// Team search and filter types
+export interface TeamSearchParams {
+  organizationId?: string;
+  search?: string;
+}
+
+// Project permission types
+export type ProjectPermission = 
+  | 'READ_SECRETS'
+  | 'WRITE_SECRETS' 
+  | 'DELETE_SECRETS'
+  | 'MANAGE_ENVIRONMENTS'
+  | 'MANAGE_FOLDERS';
+
+// Team project assignment types
+export interface TeamProject {
+  id: string;
+  project: {
+    id: string;
+    name: string;
+    description?: string;
+    organizationId: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+  permissions: ProjectPermission[];
+  assignedAt: string;
+}
+
+export interface ProjectTeam {
+  id: string;
+  team: {
+    id: string;
+    name: string;
+    description?: string;
+    organizationId: string;
+    memberCount: number;
+    createdAt: string;
+  };
+  permissions: ProjectPermission[];
+  assignedAt: string;
+}
+
+export interface AssignProjectToTeamRequest {
+  projectId: string;
+  permissions: ProjectPermission[];
+}
+
+export interface UpdateTeamProjectPermissionsRequest {
+  permissions: ProjectPermission[];
+}
+
+// Invitation types
+export interface Invitation {
+  id: string;
+  email: string;
+  role: Role;
+  teamRole?: TeamRole;
+  organization: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  team?: {
+    id: string;
+    name: string;
+  };
+  invitedBy: {
+    id: string;
+    name?: string;
+    email: string;
+  };
+  expiresAt: string;
+  createdAt: string;
+}
+
+export interface CreateInvitationRequest {
+  email: string;
+  role: Role;
+  teamRole?: TeamRole;
+}
+
+export interface AcceptInvitationRequest {
+  name?: string;
+  password?: string;
+}
+
+export interface InvitationInfo {
+  email: string;
+  role: Role;
+  teamRole?: TeamRole;
+  organization: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  team?: {
+    id: string;
+    name: string;
+  };
+  invitedBy: {
+    id: string;
+    name?: string;
+    email: string;
+  };
+  expiresAt: string;
 }

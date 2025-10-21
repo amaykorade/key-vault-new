@@ -8,6 +8,8 @@ import googleAuthRoutes from './routes/google-auth';
 import organizationRoutes from './routes/organizations';
 import projectRoutes from './routes/projects';
 import secretRoutes from './routes/secrets';
+import teamRoutes from './routes/teams';
+import invitationRoutes from './routes/invitations';
 import { requireAuth, AuthRequest } from './middleware/auth';
 
 const app = express();
@@ -49,9 +51,58 @@ app.use('/api/projects', projectRoutes);
 // Secret routes
 app.use('/api/secrets', secretRoutes);
 
+// Team routes
+app.use('/api', teamRoutes);
+
+// Invitation routes
+app.use('/api', invitationRoutes);
+
 // Protected route example
 app.get('/api/me', requireAuth, (req: AuthRequest, res) => {
 	res.json({ user: req.user });
+});
+
+// Debug email configuration (temporarily without auth for testing)
+app.get('/api/debug/email-config', (req, res) => {
+	const { loadEnv } = require('./config/env');
+	const env = loadEnv();
+	
+	res.json({
+		emailConfigured: !!(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS),
+		config: {
+			SMTP_HOST: env.SMTP_HOST || 'Not set',
+			SMTP_PORT: env.SMTP_PORT || 'Not set',
+			SMTP_SECURE: env.SMTP_SECURE || 'Not set',
+			SMTP_USER: env.SMTP_USER || 'Not set',
+			SMTP_PASS: env.SMTP_PASS ? '***' : 'Not set',
+			FROM_EMAIL: env.FROM_EMAIL || 'Not set',
+			FROM_NAME: env.FROM_NAME || 'Not set',
+			FRONTEND_URL: env.FRONTEND_URL || 'Not set'
+		}
+	});
+});
+
+// Test invitation email sending (temporarily without auth)
+app.post('/api/debug/test-invitation-email', async (req, res) => {
+	try {
+		const { EmailService } = require('./services/email');
+		
+		await EmailService.sendTeamInvitationEmail({
+			inviteeEmail: req.body.email || 'test@example.com',
+			inviterName: 'Test User',
+			organizationName: 'Test Organization',
+			teamName: 'Test Team',
+			role: 'MEMBER',
+			teamRole: 'MEMBER',
+			invitationToken: 'test-token-123',
+			expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+		});
+		
+		res.json({ success: true, message: 'Test invitation email sent!' });
+	} catch (error) {
+		console.error('Test invitation email error:', error);
+		res.status(500).json({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
+	}
 });
 
 export default app;

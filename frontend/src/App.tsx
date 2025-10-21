@@ -8,6 +8,9 @@ import { DashboardPage } from './pages/DashboardPage';
 import { OrganizationsPage } from './pages/OrganizationsPage';
 import { OrganizationDetailsPage } from './pages/OrganizationDetailsPage';
 import { ProjectDetailsPage } from './pages/ProjectDetailsPage';
+import { TeamDetailsPage } from './pages/TeamDetailsPage';
+import { TeamsPage } from './pages/TeamsPage';
+import { InvitationAcceptPage } from './pages/InvitationAcceptPage';
 import { ROUTES } from './constants';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { AppLayout } from './components/layout/AppLayout';
@@ -70,6 +73,17 @@ function App() {
           />
 
           <Route
+            path={ROUTES.TEAMS}
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <TeamsPage />
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/projects/:id"
             element={
               <ProtectedRoute>
@@ -79,6 +93,20 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          <Route
+            path="/teams/:teamId"
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <TeamDetailsPage />
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Invitation acceptance (public route) */}
+          <Route path="/invitations/:token" element={<InvitationAcceptPage />} />
 
           {/* OAuth callback */}
           <Route path={"/auth/callback"} element={<AuthCallbackPage />} />

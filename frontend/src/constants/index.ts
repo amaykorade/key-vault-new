@@ -100,6 +100,7 @@ export const ROUTES = {
   DASHBOARD: '/dashboard',
   ORGANIZATIONS: '/organizations',
   PROJECTS: '/projects',
+  TEAMS: '/teams',
   SECRETS: '/secrets',
   SETTINGS: '/settings',
 } as const;

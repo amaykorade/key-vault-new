@@ -12,7 +12,16 @@ const EnvSchema = z.object({
 	CORS_ORIGIN: z.string().optional(),
 	GOOGLE_CLIENT_ID: z.string().optional(),
 	GOOGLE_CLIENT_SECRET: z.string().optional(),
-	GOOGLE_CALLBACK_URL: z.string().url().optional()
+	GOOGLE_CALLBACK_URL: z.string().url().optional(),
+	// Email configuration
+	SMTP_HOST: z.string().optional(),
+	SMTP_PORT: z.string().optional(),
+	SMTP_SECURE: z.string().optional(),
+	SMTP_USER: z.string().optional(),
+	SMTP_PASS: z.string().optional(),
+	FROM_EMAIL: z.string().email().optional(),
+	FROM_NAME: z.string().optional(),
+	FRONTEND_URL: z.string().url().optional()
 });
 
 export type AppEnv = z.infer<typeof EnvSchema>;

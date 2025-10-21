@@ -8,19 +8,23 @@ datasource db {
 }
 
 model User {
-  id              String         @id @default(uuid())
-  email           String         @unique
-  passwordHash    String?
-  name            String?
-  emailVerifiedAt DateTime?
-  lastLoginAt     DateTime?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  image           String?
-  accounts        Account[]
-  memberships     Membership[]
-  ownedOrgs       Organization[]
-  createdSecrets  Secret[]
+  id               String           @id @default(uuid())
+  email            String           @unique
+  passwordHash     String?
+  name             String?
+  emailVerifiedAt  DateTime?
+  lastLoginAt      DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  image            String?
+  accounts         Account[]
+  memberships      Membership[]
+  ownedOrgs        Organization[]
+  createdSecrets   Secret[]
+  teamMemberships  TeamMembership[]
+  createdTeams     Team[]
+  sentInvitations  Invitation[]
+  projectMemberships ProjectMember[]
 
   @@index([email])
 }
@@ -55,6 +59,8 @@ model Organization {
   memberships Membership[]
   owner       User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   projects    Project[]
+  teams       Team[]
+  invitations Invitation[]
 
   @@index([ownerId])
   @@index([slug])
@@ -76,16 +82,41 @@ model Membership {
 }
 
 model Project {
-  id             String       @id @default(uuid())
+  id             String          @id @default(uuid())
   name           String
   description    String?
   organizationId String
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   secrets        Secret[]
+  teams          TeamProject[]
+  members        ProjectMember[]
 
   @@index([organizationId])
+}
+
+model ProjectMember {
+  id        String      @id @default(uuid())
+  projectId String
+  userId    String
+  role      ProjectRole @default(READ)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+}
+
+enum ProjectRole {
+  OWNER  // Full control, can delete project
+  ADMIN  // Can manage members and secrets
+  WRITE  // Can create/edit secrets
+  READ   // View only
 }
 
 model Secret {
@@ -100,6 +131,7 @@ model Secret {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   environment String     @default("development")
+  folder      String?    @default("default")
   createdBy   User       @relation(fields: [createdById], references: [id], onDelete: Cascade)
   project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -107,7 +139,68 @@ model Secret {
   @@index([createdById])
   @@index([type])
   @@index([environment])
-  @@unique([projectId, name, environment])
+  @@index([folder])
+  @@unique([projectId, name, environment, folder])
+}
+
+model Team {
+  id             String           @id @default(uuid())
+  name           String
+  description    String?
+  organizationId String
+  createdById    String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy      User             @relation(fields: [createdById], references: [id])
+  members        TeamMembership[]
+  projects       TeamProject[]
+  invitations    Invitation[]
+  
+  @@index([organizationId])
+  @@index([createdById])
+}
+
+model TeamMembership {
+  id        String   @id @default(uuid())
+  userId    String
+  teamId    String
+  role      TeamRole @default(MEMBER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, teamId])
+  @@index([teamId])
+  @@index([userId])
+}
+
+model Invitation {
+  id             String           @id @default(uuid())
+  email          String
+  organizationId String
+  teamId         String?
+  role           Role             @default(MEMBER)
+  teamRole       TeamRole?        @default(MEMBER)
+  invitedById    String
+  token          String           @unique
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  team           Team?            @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  invitedBy      User             @relation(fields: [invitedById], references: [id])
+  
+  @@index([email])
+  @@index([token])
+  @@index([organizationId])
+  @@index([teamId])
+  @@index([expiresAt])
 }
 
 enum Role {
@@ -115,6 +208,47 @@ enum Role {
   ADMIN
   MEMBER
   VIEWER
+}
+
+model TeamProject {
+  id          String                   @id @default(uuid())
+  teamId      String
+  projectId   String
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  
+  team        Team                     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  project     Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  permissions TeamProjectPermission[]
+  
+  @@unique([teamId, projectId])
+  @@index([teamId])
+  @@index([projectId])
+}
+
+model TeamProjectPermission {
+  id            String            @id @default(uuid())
+  teamProjectId String
+  permission    ProjectPermission
+  createdAt     DateTime          @default(now())
+  
+  teamProject   TeamProject       @relation(fields: [teamProjectId], references: [id], onDelete: Cascade)
+  
+  @@unique([teamProjectId, permission])
+  @@index([teamProjectId])
+}
+
+enum TeamRole {
+  LEAD
+  MEMBER
+}
+
+enum ProjectPermission {
+  READ_SECRETS
+  WRITE_SECRETS
+  DELETE_SECRETS
+  MANAGE_ENVIRONMENTS
+  MANAGE_FOLDERS
 }
 
 enum SecretType {

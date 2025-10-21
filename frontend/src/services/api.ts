@@ -18,13 +18,18 @@ import type {
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
 class ApiError extends Error {
+  status: number;
+  details?: Array<{ field: string; message: string }>;
+  
   constructor(
     message: string,
-    public status: number,
-    public details?: Array<{ field: string; message: string }>
+    status: number,
+    details?: Array<{ field: string; message: string }>
   ) {
     super(message);
     this.name = 'ApiError';
+    this.status = status;
+    this.details = details;
   }
 }
 
@@ -191,6 +196,35 @@ class ApiService {
     });
   }
 
+  // Project Member endpoints
+  async getProjectMembers(projectId: string): Promise<{ members: any[] }> {
+    return this.request<{ members: any[] }>(`/projects/${projectId}/members`);
+  }
+
+  async getAvailableProjectMembers(projectId: string): Promise<{ members: any[] }> {
+    return this.request<{ members: any[] }>(`/projects/${projectId}/available-members`);
+  }
+
+  async addProjectMember(projectId: string, data: any): Promise<{ member: any }> {
+    return this.request<{ member: any }>(`/projects/${projectId}/members`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateProjectMemberRole(projectId: string, userId: string, data: any): Promise<{ member: any }> {
+    return this.request<{ member: any }>(`/projects/${projectId}/members/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async removeProjectMember(projectId: string, userId: string): Promise<void> {
+    return this.request<void>(`/projects/${projectId}/members/${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Secret endpoints
   async getSecrets(projectId: string, includeValues = false): Promise<{ secrets: Secret[] }> {
     const params = new URLSearchParams();
@@ -238,6 +272,138 @@ class ApiService {
 
   async getSecretsByType(projectId: string, type: string): Promise<{ secrets: Secret[] }> {
     return this.request<{ secrets: Secret[] }>(`/secrets/projects/${projectId}/secrets/type/${type}`);
+  }
+
+  // Team methods
+  async getOrganizationTeams(organizationId: string): Promise<{ teams: any[] }> {
+    return this.request<{ teams: any[] }>(`/organizations/${organizationId}/teams`);
+  }
+
+  async getTeam(teamId: string): Promise<{ team: any }> {
+    return this.request<{ team: any }>(`/teams/${teamId}`);
+  }
+
+  async getUserTeams(): Promise<{ teams: any[] }> {
+    return this.request<{ teams: any[] }>('/users/me/teams');
+  }
+
+  async createTeam(organizationId: string, data: any): Promise<{ team: any }> {
+    return this.request<{ team: any }>(`/organizations/${organizationId}/teams`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateTeam(teamId: string, data: any): Promise<{ team: any }> {
+    return this.request<{ team: any }>(`/teams/${teamId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteTeam(teamId: string): Promise<void> {
+    return this.request<void>(`/teams/${teamId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async addTeamMember(teamId: string, data: any): Promise<{ membership: any }> {
+    return this.request<{ membership: any }>(`/teams/${teamId}/members`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async removeTeamMember(teamId: string, userId: string): Promise<void> {
+    return this.request<void>(`/teams/${teamId}/members/${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async updateTeamMemberRole(teamId: string, userId: string, data: any): Promise<{ membership: any }> {
+    return this.request<{ membership: any }>(`/teams/${teamId}/members/${userId}/role`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getOrganizationMembers(organizationId: string): Promise<{ members: any[] }> {
+    return this.request<{ members: any[] }>(`/organizations/${organizationId}/members`);
+  }
+
+  // Project assignment methods
+  async assignProjectToTeam(teamId: string, data: any): Promise<{ assignment: any }> {
+    return this.request<{ assignment: any }>(`/teams/${teamId}/projects`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async removeProjectFromTeam(teamId: string, projectId: string): Promise<void> {
+    return this.request<void>(`/teams/${teamId}/projects/${projectId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async updateTeamProjectPermissions(teamId: string, projectId: string, data: any): Promise<{ assignment: any }> {
+    return this.request<{ assignment: any }>(`/teams/${teamId}/projects/${projectId}/permissions`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getTeamProjects(teamId: string): Promise<{ projects: any[] }> {
+    return this.request<{ projects: any[] }>(`/teams/${teamId}/projects`);
+  }
+
+  async getProjectTeams(projectId: string): Promise<{ teams: any[] }> {
+    return this.request<{ teams: any[] }>(`/projects/${projectId}/teams`);
+  }
+
+  // Invitation methods
+  async sendOrganizationInvitation(organizationId: string, data: any): Promise<any> {
+    return this.request<any>(`/organizations/${organizationId}/invitations`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async sendTeamInvitation(teamId: string, data: any): Promise<any> {
+    return this.request<any>(`/teams/${teamId}/invitations`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getInvitationByToken(token: string): Promise<{ invitation: any }> {
+    return this.request<{ invitation: any }>(`/invitations/${token}`);
+  }
+
+  async acceptInvitation(token: string, data: any): Promise<any> {
+    return this.request<any>(`/invitations/${token}/accept`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getOrganizationInvitations(organizationId: string): Promise<{ invitations: any[] }> {
+    return this.request<{ invitations: any[] }>(`/organizations/${organizationId}/invitations`);
+  }
+
+  async getTeamInvitations(teamId: string): Promise<{ invitations: any[] }> {
+    return this.request<{ invitations: any[] }>(`/teams/${teamId}/invitations`);
+  }
+
+  async cancelInvitation(invitationId: string): Promise<void> {
+    return this.request<void>(`/invitations/${invitationId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async resendInvitation(invitationId: string): Promise<{ invitation: any }> {
+    return this.request<{ invitation: any }>(`/invitations/${invitationId}/resend`, {
+      method: 'POST',
+    });
   }
 
   // Utility methods
