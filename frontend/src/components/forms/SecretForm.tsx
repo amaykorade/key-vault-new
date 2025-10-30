@@ -64,7 +64,9 @@ export function SecretForm({
   initialData,
   title = "Create Secret"
 }: SecretFormProps) {
-  const [showValue, setShowValue] = useState(false);
+  // Default to showing value when creating new secrets (no initial value)
+  // Only hide when editing existing secrets that have a value
+  const [showValue, setShowValue] = useState(!initialData?.value);
 
   const {
     register,
@@ -99,11 +101,30 @@ export function SecretForm({
   };
 
   return (
-    <Card className="w-full max-w-2xl">
-      <CardHeader>
-        <CardTitle className="text-white">{title}</CardTitle>
+    <Card className="w-full max-w-2xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-700 shadow-2xl">
+      <CardHeader className="border-b border-gray-700 pb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
+            </div>
+            <CardTitle className="text-white text-xl font-bold">{title}</CardTitle>
+          </div>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isLoading}
+            className="text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-6">
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
@@ -118,7 +139,7 @@ export function SecretForm({
               <label className="text-sm font-medium text-gray-300">Secret Type</label>
               <select
                 {...register('type')}
-                className="flex h-11 w-full rounded-lg border border-gray-700 bg-gray-800/50 px-4 py-3 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-11 w-full rounded-lg border border-gray-700 bg-gray-800/50 px-4 py-3 text-sm text-white placeholder:text-gray-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {SECRET_TYPES.map((type) => (
                   <option key={type.value} value={type.value}>
@@ -137,7 +158,7 @@ export function SecretForm({
               <label className="text-sm font-medium text-gray-300">Environment</label>
               <select
                 {...register('environment')}
-                className="flex h-11 w-full rounded-lg border border-gray-700 bg-gray-800/50 px-4 py-3 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-11 w-full rounded-lg border border-gray-700 bg-gray-800/50 px-4 py-3 text-sm text-white placeholder:text-gray-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {ENVIRONMENTS.map((env) => (
                   <option key={env.value} value={env.value}>
@@ -157,7 +178,7 @@ export function SecretForm({
                   {...register('folder')}
                   list="folder-suggestions"
                   placeholder="Select or type custom folder name"
-                  className="flex h-11 w-full rounded-lg border border-gray-700 bg-gray-800/50 px-4 py-3 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-11 w-full rounded-lg border border-gray-700 bg-gray-800/50 px-4 py-3 text-sm text-white placeholder:text-gray-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                   autoComplete="off"
                 />
                 <datalist id="folder-suggestions">
@@ -216,7 +237,7 @@ export function SecretForm({
               <textarea
                 {...register('value')}
                 placeholder="Enter the secret value..."
-                className="flex min-h-[100px] w-full rounded-lg border border-gray-700 bg-gray-800/50 px-4 py-3 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 resize-none text-white"
+                className="flex min-h-[100px] w-full rounded-lg border border-gray-700 bg-gray-800/50 px-4 py-3 text-sm placeholder:text-gray-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 resize-none text-white"
                 style={{
                   fontFamily: 'monospace',
                   letterSpacing: '0.05em',
@@ -233,12 +254,13 @@ export function SecretForm({
             )}
           </div>
 
-          <div className="flex justify-end space-x-4">
+          <div className="flex justify-end space-x-4 pt-6 border-t border-gray-700">
             <Button
               type="button"
               variant="outline"
               onClick={onCancel}
               disabled={isLoading}
+              className="hover:bg-gray-700"
             >
               Cancel
             </Button>
@@ -247,7 +269,15 @@ export function SecretForm({
               variant="gradient"
               loading={isLoading}
               disabled={isLoading}
+              className="shadow-lg"
             >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {initialData ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                )}
+              </svg>
               {initialData ? 'Update Secret' : 'Create Secret'}
             </Button>
           </div>

@@ -2,8 +2,13 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
 import { apiService } from '../services/api';
+import { InviteOrganizationMemberModal } from '../components/InviteOrganizationMemberModal';
+import { OrganizationMembersSection } from '../components/OrganizationMembersSection';
+import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
+import { CreateProjectModal } from '../components/modals/CreateProjectModal';
+import { EditProjectModal } from '../components/modals/EditProjectModal';
+import { EditOrganizationModal } from '../components/modals/EditOrganizationModal';
 import type { Organization, Project } from '../types';
 
 export function OrganizationDetailsPage() {
@@ -12,22 +17,22 @@ export function OrganizationDetailsPage() {
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showCreateProject, setShowCreateProject] = useState(false);
-  const [projectName, setProjectName] = useState('');
-  const [projectDescription, setProjectDescription] = useState('');
+  const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
-  const [showEditOrganization, setShowEditOrganization] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [editDescription, setEditDescription] = useState('');
+  const [showEditOrganizationModal, setShowEditOrganizationModal] = useState(false);
   const [isEditingOrganization, setIsEditingOrganization] = useState(false);
   const [isDeletingOrganization, setIsDeletingOrganization] = useState(false);
   const [showProjectMenu, setShowProjectMenu] = useState<string | null>(null);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [editProjectName, setEditProjectName] = useState('');
-  const [editProjectDescription, setEditProjectDescription] = useState('');
+  const [showEditProjectModal, setShowEditProjectModal] = useState(false);
   const [isUpdatingProject, setIsUpdatingProject] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showDeleteProjectModal, setShowDeleteProjectModal] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [isDeletingProject, setIsDeletingProject] = useState(false);
+  const [showDeleteOrganizationModal, setShowDeleteOrganizationModal] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -64,47 +69,43 @@ export function OrganizationDetailsPage() {
     }
   };
 
+
   const handleEdit = () => {
     if (!organization) return;
-    setEditName(organization.name);
-    setEditDescription(organization.description || '');
-    setShowEditOrganization(true);
+    setShowEditOrganizationModal(true);
   };
 
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!organization || !editName.trim()) return;
+  const handleEditSubmit = async (name: string, description?: string) => {
+    if (!organization) return;
     
     // Check permissions before attempting to edit
     if (organization.role !== 'OWNER' && organization.role !== 'ADMIN') {
-      setError('You do not have permission to edit this organization');
-      return;
+      throw new Error('You do not have permission to edit this organization');
     }
     
     setIsEditingOrganization(true);
     setError(null);
     try {
       const response = await apiService.updateOrganization(organization.id, {
-        name: editName.trim(),
-        description: editDescription.trim() || undefined,
+        name: name.trim(),
+        description: description || undefined,
       });
       
       setOrganization(response.organization);
-      setShowEditOrganization(false);
-      setEditName('');
-      setEditDescription('');
+      setShowEditOrganizationModal(false);
     } catch (err: any) {
       if (err.status === 403 || err.message?.includes('Insufficient permissions')) {
         setError('You do not have permission to edit this organization');
       } else {
         setError(err.message || 'Failed to update organization');
       }
+      throw err;
     } finally {
       setIsEditingOrganization(false);
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!organization) return;
     
     // Check permissions before attempting to delete
@@ -113,109 +114,106 @@ export function OrganizationDetailsPage() {
       return;
     }
     
-    if (window.confirm(`Are you sure you want to delete "${organization.name}"? This action cannot be undone and will delete all projects and secrets.`)) {
-      setIsDeletingOrganization(true);
-      setError(null);
-      try {
-        await apiService.deleteOrganization(organization.id);
-        navigate('/organizations');
-      } catch (err: any) {
-        if (err.status === 403 || err.message?.includes('Insufficient permissions')) {
-          setError('Only the organization owner can delete the organization');
-        } else {
-          setError(err.message || 'Failed to delete organization');
-        }
-      } finally {
-        setIsDeletingOrganization(false);
-      }
-    }
+    setShowDeleteOrganizationModal(true);
   };
 
-  const handleInviteTeam = () => {
-    // TODO: Implement invite team functionality
-    console.log('Invite team members for organization:', organization?.id);
+  const handleConfirmDeleteOrganization = async () => {
+    if (!organization) return;
+
+    setIsDeletingOrganization(true);
+    setError(null);
+    try {
+      await apiService.deleteOrganization(organization.id);
+      navigate('/organizations');
+    } catch (err: any) {
+      if (err.status === 403 || err.message?.includes('Insufficient permissions')) {
+        setError('Only the organization owner can delete the organization');
+      } else {
+        setError(err.message || 'Failed to delete organization');
+      }
+    } finally {
+      setIsDeletingOrganization(false);
+    }
   };
 
   const handleEditProject = (project: Project) => {
     setEditingProject(project);
-    setEditProjectName(project.name);
-    setEditProjectDescription(project.description || '');
+    setShowEditProjectModal(true);
     setShowProjectMenu(null);
   };
 
-  const handleUpdateProject = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingProject || !editProjectName.trim()) return;
+  const handleUpdateProject = async (name: string, description?: string) => {
+    if (!editingProject) return;
 
     setIsUpdatingProject(true);
     try {
       await apiService.updateProject(editingProject.id, {
-        name: editProjectName.trim(),
-        description: editProjectDescription.trim() || undefined,
+        name: name.trim(),
+        description: description || undefined,
       });
       await fetchProjects();
+      setShowEditProjectModal(false);
       setEditingProject(null);
-      setEditProjectName('');
-      setEditProjectDescription('');
     } catch (err: any) {
       console.error('Failed to update project:', err);
       setError(err.message || 'Failed to update project');
+      throw err;
     } finally {
       setIsUpdatingProject(false);
     }
   };
 
-  const handleDeleteProject = async (project: Project) => {
-    if (!confirm(`Delete project "${project.name}"? This will delete all secrets. This action cannot be undone.`)) {
-      return;
-    }
+  const handleDeleteProject = (project: Project) => {
+    setProjectToDelete(project);
+    setShowDeleteProjectModal(true);
+    setShowProjectMenu(null);
+  };
 
+  const handleConfirmDeleteProject = async () => {
+    if (!projectToDelete) return;
+
+    setIsDeletingProject(true);
     try {
-      await apiService.deleteProject(project.id);
+      await apiService.deleteProject(projectToDelete.id);
       await fetchProjects();
-      setShowProjectMenu(null);
+      setShowDeleteProjectModal(false);
+      setProjectToDelete(null);
     } catch (err: any) {
       console.error('Failed to delete project:', err);
       setError(err.message || 'Failed to delete project');
+    } finally {
+      setIsDeletingProject(false);
     }
   };
 
   const handleCreateProject = () => {
-    setShowCreateProject(true);
+    setShowCreateProjectModal(true);
   };
 
-  const handleSubmitProject = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!projectName.trim() || !organization?.id) return;
+  const handleSubmitProject = async (name: string, description?: string) => {
+    if (!organization?.id) return;
     
     setIsCreatingProject(true);
     try {
       await apiService.createProject(organization.id, {
-        name: projectName.trim(),
-        description: projectDescription.trim() || undefined
+        name: name.trim(),
+        description: description || undefined
       });
       
-      // Reset form and close modal
-      setProjectName('');
-      setProjectDescription('');
-      setShowCreateProject(false);
-      
-      // Refresh projects list
-      fetchProjects();
-      
-      // TODO: Show success message
-      console.log('Project created successfully');
+      // Close modal and refresh projects list
+      setShowCreateProjectModal(false);
+      await fetchProjects();
     } catch (err: any) {
       setError(err.message || 'Failed to create project');
+      throw err;
     } finally {
       setIsCreatingProject(false);
     }
   };
 
-  const handleCancelProject = () => {
-    setProjectName('');
-    setProjectDescription('');
-    setShowCreateProject(false);
+  const handleInviteMember = async (email: string, role: string) => {
+    if (!id) return;
+    await apiService.sendOrganizationInvitation(id, { email, role });
   };
 
   if (isLoading) {
@@ -286,89 +284,121 @@ export function OrganizationDetailsPage() {
     <div className="space-y-8 animate-fade-in">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
-            <span className="text-white font-bold text-2xl">
+          <div className="w-12 h-12 bg-gradient-to-r from-gray-600 to-gray-700 rounded-lg flex items-center justify-center">
+            <span className="text-white font-bold text-xl">
               {organization.name.charAt(0).toUpperCase()}
             </span>
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-white">{organization.name}</h1>
-            <p className="text-gray-400">Organization Details</p>
+            <h1 className="text-2xl font-bold text-white leading-tight">{organization.name}</h1>
+            {organization.description ? (
+              <p className="text-gray-400 text-sm line-clamp-1">{organization.description}</p>
+            ) : (
+              <p className="text-gray-500 text-xs">Workspace</p>
+            )}
           </div>
         </div>
-        <div className="flex space-x-3">
+        <div className="flex items-center gap-3">
           {canEdit && (
-            <Button variant="outline" onClick={handleEdit} className="hover:bg-blue-600 hover:border-blue-600 hover:text-white">
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-              Edit
-            </Button>
-          )}
-          {canDelete && (
             <Button 
-              variant="outline" 
-              onClick={handleDelete} 
-              className="text-red-400 hover:bg-red-600 hover:border-red-600 hover:text-white"
-              loading={isDeletingOrganization}
-              disabled={isDeletingOrganization}
+              variant="gradient" 
+              size="sm"
+              onClick={() => setShowInviteModal(true)}
+              className="shadow-lg"
             >
               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
               </svg>
-              {isDeletingOrganization ? 'Deleting...' : 'Delete'}
+              Invite Member
             </Button>
           )}
+          {canCreateProject && (
+            <Button 
+              variant="gradient"
+              size="sm"
+              onClick={handleCreateProject}
+              className="shadow-lg"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Create Project
+            </Button>
+          )}
+          <div className="relative">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setShowProjectMenu('org-menu')}
+              className="hover:bg-gray-800"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+              </svg>
+            </Button>
+            {showProjectMenu === 'org-menu' && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowProjectMenu(null)} />
+                <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-xl border border-gray-700 py-1 z-50">
+                  {canEdit && (
+                    <button
+                      onClick={() => {
+                        handleEdit();
+                        setShowProjectMenu(null);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      Edit Organization
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button
+                      onClick={() => {
+                        handleDelete();
+                        setShowProjectMenu(null);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-red-900/20 flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Delete Organization
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <Card className="mb-4">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium">Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="flex flex-wrap gap-3">
-            {canEdit && (
-              <Button onClick={handleInviteTeam} className="flex items-center space-x-2">
-                <span>👥</span>
-                <span>Invite Team Members</span>
-              </Button>
-            )}
-            {canCreateProject && (
-              <Button onClick={handleCreateProject} variant="outline" className="flex items-center space-x-2">
-                <span>📁</span>
-                <span>Create Project</span>
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card className="hover-lift">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-white flex items-center">
-              <svg className="w-5 h-5 mr-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-white text-sm font-semibold flex items-center">
+              <svg className="w-4 h-4 mr-2 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               Basic Information
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="space-y-4">
-              <div className="flex justify-between items-center py-2 border-b border-gray-800">
-                <span className="text-sm font-medium text-gray-400">Name</span>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center py-2 border-b border-gray-800/60">
+                <span className="text-xs font-medium text-gray-400">Name</span>
                 <span className="text-sm text-white font-medium">{organization.name}</span>
               </div>
-              <div className="flex justify-between items-center py-2 border-b border-gray-800">
-                <span className="text-sm font-medium text-gray-400">Slug</span>
-                <span className="text-sm text-gray-300 font-mono bg-gray-800 px-2 py-1 rounded">{organization.slug}</span>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800/60">
+                <span className="text-xs font-medium text-gray-400">Slug</span>
+                <span className="text-xs text-gray-300 font-mono bg-gray-800 px-2 py-1 rounded">{organization.slug}</span>
               </div>
               {organization.description && (
                 <div className="flex justify-between items-start py-2">
-                  <span className="text-sm font-medium text-gray-400">Description</span>
-                  <span className="text-sm text-gray-300 text-right max-w-xs">{organization.description}</span>
+                  <span className="text-xs font-medium text-gray-400">Description</span>
+                  <span className="text-sm text-gray-300 text-right max-w-xs line-clamp-2">{organization.description}</span>
                 </div>
               )}
             </div>
@@ -376,350 +406,266 @@ export function OrganizationDetailsPage() {
         </Card>
 
         <Card className="hover-lift">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-white flex items-center">
-              <svg className="w-5 h-5 mr-3 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-white text-sm font-semibold flex items-center">
+              <svg className="w-4 h-4 mr-2 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               Access & Status
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="space-y-4">
-              <div className="flex justify-between items-center py-2 border-b border-gray-800">
-                <span className="text-sm font-medium text-gray-400">Your Role</span>
-                <span className="text-sm font-medium text-emerald-400 bg-emerald-900/20 px-3 py-1 rounded-lg border border-emerald-800">
+            <div className="space-y-3">
+              <div className="flex justify-between items-center py-2 border-b border-gray-800/60">
+                <span className="text-xs font-medium text-gray-400">Your Role</span>
+                <span className="text-xs font-medium text-emerald-400 bg-emerald-900/20 px-2.5 py-0.5 rounded-lg border border-emerald-800">
                   {organization.role || 'Unknown'}
                 </span>
               </div>
-              <div className="flex justify-between items-center py-2 border-b border-gray-800">
-                <span className="text-sm font-medium text-gray-400">Created</span>
-                <span className="text-sm text-gray-300">{new Date(organization.createdAt).toLocaleDateString()}</span>
+              <div className="flex justify-between items-center py-2 border-b border-gray-800/60">
+                <span className="text-xs font-medium text-gray-400">Created</span>
+                <span className="text-xs text-gray-300">{new Date(organization.createdAt).toLocaleDateString()}</span>
               </div>
               <div className="flex justify-between items-center py-2">
-                <span className="text-sm font-medium text-gray-400">Last Updated</span>
-                <span className="text-sm text-gray-300">{new Date(organization.updatedAt).toLocaleDateString()}</span>
+                <span className="text-xs font-medium text-gray-400">Last Updated</span>
+                <span className="text-xs text-gray-300">{new Date(organization.updatedAt).toLocaleDateString()}</span>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
+      {/* Organization Members */}
+      <OrganizationMembersSection 
+        organizationId={organization.id} 
+        userRole={organization.role}
+      />
+
       {/* Projects Section */}
       <Card className="hover-lift">
-        <CardHeader className="pb-4">
+        <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-white flex items-center">
-              <svg className="w-6 h-6 mr-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <CardTitle className="text-white text-sm font-semibold flex items-center">
+              <svg className="w-4 h-4 mr-2 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z" />
               </svg>
               Projects
             </CardTitle>
-            {canCreateProject && (
-              <Button 
-                variant="gradient"
-                onClick={handleCreateProject}
-                className="flex items-center space-x-2 shadow-lg"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                <span>New Project</span>
-              </Button>
-            )}
+            <div className="text-sm text-gray-400">
+              {projects.length} {projects.length === 1 ? 'project' : 'projects'}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="pt-0">
           {isLoadingProjects ? (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="animate-pulse">
-                  <div className="bg-gray-800 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
+                  <div className="bg-gray-800 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-1.5">
                       <div className="space-y-2">
                         <div className="h-4 bg-gray-700 rounded w-48"></div>
                         <div className="h-3 bg-gray-800 rounded w-32"></div>
                       </div>
-                      <div className="h-6 bg-gray-700 rounded w-16"></div>
+                      <div className="h-5 bg-gray-700 rounded w-14"></div>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
           ) : projects.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-medium text-white mb-2">No projects yet</h3>
-              <p className="text-gray-400 mb-6">Create your first project to start organizing your secrets</p>
-              {canCreateProject && (
-                <Button 
-                  variant="gradient"
-                  onClick={handleCreateProject}
-                  className="flex items-center space-x-2 shadow-lg"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              <div className="text-center py-16">
+                <div className="w-20 h-20 bg-gradient-to-br from-amber-900/30 to-orange-900/30 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-amber-800/20">
+                  <svg className="w-10 h-10 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z" />
                   </svg>
-                  <span>Create your first project</span>
-                </Button>
-              )}
-            </div>
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-2">No projects yet</h3>
+                <p className="text-gray-400 mb-6 max-w-sm mx-auto">
+                  Create your first project to start organizing your secrets and credentials
+                </p>
+                {canCreateProject && (
+                  <Button 
+                    variant="gradient"
+                    onClick={handleCreateProject}
+                    className="shadow-lg"
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    Create your first project
+                  </Button>
+                )}
+              </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {projects.map((project) => (
-                <div key={project.id} className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 hover:bg-gray-800 hover:border-gray-600 transition-all duration-200 group relative">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1 cursor-pointer" onClick={() => navigate(`/projects/${project.id}`)}>
-                      <h4 className="font-medium text-white text-sm group-hover:text-amber-400 transition-colors">{project.name}</h4>
-                      {project.description && (
-                        <p className="text-xs text-gray-400 mt-1 line-clamp-2">{project.description}</p>
+              {projects.map((project) => {
+                const canManage = (project as any).role === 'ADMIN' || (project as any).role === 'OWNER' || organization?.role === 'OWNER' || organization?.role === 'ADMIN';
+                return (
+                  <div 
+                    key={project.id} 
+                    className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700 rounded-xl p-5 hover:border-gray-600 transition-all duration-200 group cursor-pointer"
+                    onClick={() => navigate(`/projects/${project.id}`)}
+                  >
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-2.5">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-white group-hover:text-amber-400 transition-colors line-clamp-1 text-sm">
+                          {project.name}
+                        </h4>
+                        {project.description && (
+                          <p className="text-xs text-gray-400 mt-1 line-clamp-2">{project.description}</p>
+                        )}
+                      </div>
+                      {canManage && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowProjectMenu(showProjectMenu === project.id ? null : project.id);
+                          }}
+                          className="ml-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                          </svg>
+                        </Button>
                       )}
                     </div>
-                    <div className="flex gap-1 flex-shrink-0">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => navigate(`/projects/${project.id}`)}
-                        className="text-xs hover:bg-amber-600 hover:border-amber-600 hover:text-white"
-                      >
-                        Open
-                      </Button>
-                      {/* Show menu only if user can manage project (ADMIN or OWNER) */}
-                      {((project as any).role === 'ADMIN' || (project as any).role === 'OWNER' || organization?.role === 'OWNER' || organization?.role === 'ADMIN') && (
-                        <div className="relative">
-                          <Button
-                            variant="outline"
-                            size="sm"
+
+                    {/* Menu */}
+                    {canManage && showProjectMenu === project.id && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setShowProjectMenu(null)} />
+                        <div className="absolute right-4 mt-1 w-48 bg-gray-800 rounded-lg shadow-xl border border-gray-700 py-1 z-50">
+                          <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              setShowProjectMenu(showProjectMenu === project.id ? null : project.id);
+                              handleEditProject(project);
                             }}
-                            className="text-xs"
+                            className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
                           >
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
-                          </Button>
-                          {showProjectMenu === project.id && (
-                            <>
-                              <div className="fixed inset-0 z-40" onClick={() => setShowProjectMenu(null)} />
-                              <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50">
-                                <button
-                                  onClick={() => handleEditProject(project)}
-                                  className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                  Edit
-                                </button>
-                                {((project as any).role === 'OWNER' || organization?.role === 'OWNER' || organization?.role === 'ADMIN') && (
-                                  <button
-                                    onClick={() => handleDeleteProject(project)}
-                                    className="w-full px-3 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                    Delete
-                                  </button>
-                                )}
-                              </div>
-                            </>
+                            Edit
+                          </button>
+                          {((project as any).role === 'OWNER' || organization?.role === 'OWNER' || organization?.role === 'ADMIN') && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteProject(project);
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-red-900/20 flex items-center gap-2"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              Delete
+                            </button>
                           )}
                         </div>
+                      </>
+                    )}
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-700/50">
+                      <div className="text-[11px] text-gray-500 flex items-center">
+                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {new Date(project.createdAt).toLocaleDateString()}
+                      </div>
+                      {(project as any).role && (
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
+                          (project as any).role === 'OWNER' ? 'bg-red-900/20 text-red-400 border-red-800/30' :
+                          (project as any).role === 'ADMIN' ? 'bg-orange-900/20 text-orange-400 border-orange-800/30' :
+                          (project as any).role === 'WRITE' ? 'bg-blue-900/20 text-blue-400 border-blue-800/30' :
+                          'bg-emerald-900/20 text-emerald-400 border-emerald-800/30'
+                        }`}>
+                          {(project as any).role}
+                        </span>
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <div className="text-gray-500 flex items-center">
-                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      {new Date(project.createdAt).toLocaleDateString()}
-                    </div>
-                    {(project as any).role && (
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        (project as any).role === 'OWNER' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                        (project as any).role === 'ADMIN' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' :
-                        (project as any).role === 'WRITE' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                        'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                      }`}>
-                        {(project as any).role}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
       </Card>
 
       {/* Create Project Modal */}
-      {showCreateProject && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Create New Project</h3>
-            
-            <form onSubmit={handleSubmitProject} className="space-y-4">
-              <Input
-                label="Project Name"
-                placeholder="e.g. My Web App"
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                required
-              />
-              
-              <Input
-                label="Description (optional)"
-                placeholder="Brief description of the project"
-                value={projectDescription}
-                onChange={(e) => setProjectDescription(e.target.value)}
-              />
-              
-              {error && (
-                <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
-                  {error}
-                </div>
-              )}
-              
-              <div className="flex justify-end space-x-3 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleCancelProject}
-                  disabled={isCreatingProject}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  loading={isCreatingProject}
-                  disabled={!projectName.trim() || isCreatingProject}
-                >
-                  Create Project
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <CreateProjectModal
+        isOpen={showCreateProjectModal}
+        onClose={() => setShowCreateProjectModal(false)}
+        onCreate={handleSubmitProject}
+        isLoading={isCreatingProject}
+      />
 
       {/* Edit Project Modal */}
-      {editingProject && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Edit Project</h3>
-            
-            <form onSubmit={handleUpdateProject} className="space-y-4">
-              <Input
-                label="Project Name"
-                placeholder="e.g. My Web App"
-                value={editProjectName}
-                onChange={(e) => setEditProjectName(e.target.value)}
-                required
-              />
-              
-              <div>
-                <label htmlFor="editProjectDescription" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Description (optional)
-                </label>
-                <textarea
-                  id="editProjectDescription"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  rows={3}
-                  placeholder="Brief description of this project..."
-                  value={editProjectDescription}
-                  onChange={(e) => setEditProjectDescription(e.target.value)}
-                />
-              </div>
-              
-              <div className="flex justify-end space-x-3 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setEditingProject(null);
-                    setEditProjectName('');
-                    setEditProjectDescription('');
-                  }}
-                  disabled={isUpdatingProject}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  variant="gradient"
-                  disabled={isUpdatingProject || !editProjectName.trim()}
-                >
-                  {isUpdatingProject ? 'Updating...' : 'Update Project'}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <EditProjectModal
+        isOpen={showEditProjectModal}
+        onClose={() => {
+          setShowEditProjectModal(false);
+          setEditingProject(null);
+        }}
+        onUpdate={handleUpdateProject}
+        project={editingProject}
+        isLoading={isUpdatingProject}
+      />
 
       {/* Edit Organization Modal */}
-      {showEditOrganization && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Edit Organization</h3>
-            
-            <form onSubmit={handleEditSubmit} className="space-y-4">
-              <Input
-                label="Organization Name"
-                placeholder="e.g. My Company"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                required
-              />
-              
-              <Input
-                label="Description (optional)"
-                placeholder="Brief description of your organization"
-                value={editDescription}
-                onChange={(e) => setEditDescription(e.target.value)}
-              />
-              
-              {error && (
-                <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
-                  {error}
-                </div>
-              )}
-              
-              <div className="flex justify-end space-x-3 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setShowEditOrganization(false);
-                    setEditName('');
-                    setEditDescription('');
-                    setError(null);
-                  }}
-                  disabled={isEditingOrganization}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  loading={isEditingOrganization}
-                  disabled={!editName.trim() || isEditingOrganization}
-                >
-                  Save Changes
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
+      <EditOrganizationModal
+        isOpen={showEditOrganizationModal}
+        onClose={() => setShowEditOrganizationModal(false)}
+        onUpdate={handleEditSubmit}
+        organization={organization}
+        isLoading={isEditingOrganization}
+      />
+
+      
+
+      {/* Invite Member Modal */}
+      {showInviteModal && (
+        <InviteOrganizationMemberModal
+          onClose={() => setShowInviteModal(false)}
+          onInvite={handleInviteMember}
+        />
+      )}
+
+      {/* Delete Project Confirmation Modal */}
+      {showDeleteProjectModal && projectToDelete && (
+        <ConfirmDeleteModal
+          isOpen={showDeleteProjectModal}
+          onClose={() => {
+            setShowDeleteProjectModal(false);
+            setProjectToDelete(null);
+          }}
+          onConfirm={handleConfirmDeleteProject}
+          title="Delete Project"
+          itemName={projectToDelete.name}
+          itemType="project"
+          description="This will permanently delete the project and all of its secrets. This action cannot be undone."
+          isLoading={isDeletingProject}
+        />
+      )}
+
+      {/* Delete Organization Confirmation Modal */}
+      {showDeleteOrganizationModal && organization && (
+        <ConfirmDeleteModal
+          isOpen={showDeleteOrganizationModal}
+          onClose={() => setShowDeleteOrganizationModal(false)}
+          onConfirm={handleConfirmDeleteOrganization}
+          title="Delete Organization"
+          itemName={organization.name}
+          itemType="organization"
+          description="This will permanently delete the organization and all of its projects and secrets. This action cannot be undone."
+          isLoading={isDeletingOrganization}
+        />
       )}
     </div>
   );

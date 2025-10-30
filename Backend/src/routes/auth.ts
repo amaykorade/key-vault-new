@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../lib/db';
 import { AuthSchema, hashPassword, verifyPassword, generateTokens } from '../lib/auth';
+import { AuditService } from '../services/audit';
 
 const router = Router();
 
@@ -69,6 +70,11 @@ router.post('/login', async (req, res) => {
     });
 
     if (!user) {
+      // Log failed login attempt
+      const ipAddress = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
+      const userAgent = req.get('User-Agent');
+      AuditService.logUserLogin('unknown', false, ipAddress, userAgent).catch(console.error);
+      
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -79,6 +85,11 @@ router.post('/login', async (req, res) => {
     
     const isValidPassword = await verifyPassword(password, user.passwordHash);
     if (!isValidPassword) {
+      // Log failed login attempt
+      const ipAddress = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
+      const userAgent = req.get('User-Agent');
+      AuditService.logUserLogin(user.id, false, ipAddress, userAgent).catch(console.error);
+      
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -90,6 +101,11 @@ router.post('/login', async (req, res) => {
 
     // Generate tokens
     const { accessToken, refreshToken } = generateTokens(user.id);
+
+    // Log successful login
+    const ipAddress = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
+    const userAgent = req.get('User-Agent');
+    AuditService.logUserLogin(user.id, true, ipAddress, userAgent).catch(console.error);
 
     res.json({
       user: {

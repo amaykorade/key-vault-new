@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { SecretService, SecretSchema } from '../services/secret';
 import { requireAuth, AuthRequest } from '../middleware/auth';
+import { auditSecretCreate, auditSecretUpdate, auditSecretDelete, auditSecretAccess } from '../middleware/audit';
 
 const router = Router();
 
@@ -112,7 +113,7 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res) => {
 });
 
 // Update secret
-router.put('/:id', requireAuth, async (req: AuthRequest, res) => {
+router.put('/:id', requireAuth, auditSecretUpdate, async (req: AuthRequest, res) => {
   try {
     const data = SecretSchema.update.parse(req.body);
     const secret = await SecretService.updateSecret(req.params.id, req.user!.id, data);
@@ -151,7 +152,7 @@ router.put('/:id', requireAuth, async (req: AuthRequest, res) => {
 });
 
 // Delete secret
-router.delete('/:id', requireAuth, async (req: AuthRequest, res) => {
+router.delete('/:id', requireAuth, auditSecretDelete, async (req: AuthRequest, res) => {
   try {
     await SecretService.deleteSecret(req.params.id, req.user!.id);
     

@@ -102,6 +102,9 @@ export const ROUTES = {
   PROJECTS: '/projects',
   TEAMS: '/teams',
   SECRETS: '/secrets',
+  API: '/api',
+  API_TOKENS: '/api/tokens',
+  AUDIT: '/audit',
   SETTINGS: '/settings',
 } as const;
 

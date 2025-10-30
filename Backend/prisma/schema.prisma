@@ -25,8 +25,31 @@ model User {
   createdTeams     Team[]
   sentInvitations  Invitation[]
   projectMemberships ProjectMember[]
+  auditLogs        AuditLog[]
+  createdApiKeys   ProjectApiKey[]
+  apiTokens        UserApiToken[]
 
   @@index([email])
+}
+
+/// Personal Access Token (user-scoped) that inherits user's RBAC
+model UserApiToken {
+  id           String   @id @default(uuid())
+  userId       String
+  name         String
+  tokenHash    String   @unique
+  projects     String[] @default([])
+  environments String[] @default([])
+  folders      String[] @default([])
+  ipAllowlist  String[] @default([])
+  expiresAt    DateTime?
+  lastUsedAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Account {
@@ -61,6 +84,7 @@ model Organization {
   projects    Project[]
   teams       Team[]
   invitations Invitation[]
+  auditLogs   AuditLog[]
 
   @@index([ownerId])
   @@index([slug])
@@ -92,6 +116,8 @@ model Project {
   secrets        Secret[]
   teams          TeamProject[]
   members        ProjectMember[]
+  auditLogs      AuditLog[]
+  apiKeys        ProjectApiKey[]
 
   @@index([organizationId])
 }
@@ -134,6 +160,7 @@ model Secret {
   folder      String?    @default("default")
   createdBy   User       @relation(fields: [createdById], references: [id], onDelete: Cascade)
   project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  auditLogs   AuditLog[]
 
   @@index([projectId])
   @@index([createdById])
@@ -261,4 +288,59 @@ enum SecretType {
   CERTIFICATE
   PASSWORD
   OTHER
+}
+
+model AuditLog {
+  id             String    @id @default(uuid())
+  userId         String?
+  organizationId String?
+  projectId      String?
+  secretId       String?
+  
+  // Event details
+  eventType      String    // 'user_login', 'secret_access', 'secret_create', etc.
+  action         String    // 'view', 'create', 'update', 'delete', 'success', 'failed'
+  resourceName   String?   // 'Secret: API_KEY', 'Project: My App', 'User: john@example.com'
+  
+  // Context
+  description    String?
+  ipAddress      String?
+  userAgent      String?
+  
+  // Timestamps
+  createdAt      DateTime  @default(now())
+  
+  // Relations
+  user           User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organization   Organization?    @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  project        Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  secret         Secret?          @relation(fields: [secretId], references: [id], onDelete: SetNull)
+  
+  @@index([userId])
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+/// API key for project-level secret access via public API
+model ProjectApiKey {
+  id           String   @id @default(uuid())
+  projectId    String
+  name         String
+  tokenHash    String   @unique // sha256(token) hex
+  scopes       Json?
+  environments String[] @default([])
+  folders      String[] @default([])
+  ipAllowlist  String[] @default([])
+  expiresAt    DateTime?
+  lastUsedAt   DateTime?
+  createdById  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy    User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
 }

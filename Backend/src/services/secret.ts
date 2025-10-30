@@ -25,8 +25,13 @@ export const SecretSchema = {
 export class SecretService {
   // Create secret in project
   static async createSecret(projectId: string, userId: string, data: z.infer<typeof SecretSchema.create>) {
+    console.log('SecretService.createSecret called with:', { projectId, userId, data });
+    
     // Check if user has write access to this project
+    console.log('Checking write access...');
     const canWrite = await AccessControlService.canWrite(userId, projectId);
+    console.log('Write access result:', canWrite);
+    
     if (!canWrite) {
       throw new Error('Access denied: You need WRITE permission to create secrets');
     }

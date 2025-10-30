@@ -10,6 +10,10 @@ import projectRoutes from './routes/projects';
 import secretRoutes from './routes/secrets';
 import teamRoutes from './routes/teams';
 import invitationRoutes from './routes/invitations';
+import auditRoutes from './routes/audit';
+import publicSecretsRoutes from './routes/public-secrets';
+import apiKeysRoutes from './routes/api-keys';
+import tokensRoutes from './routes/tokens';
 import { requireAuth, AuthRequest } from './middleware/auth';
 
 const app = express();
@@ -56,6 +60,14 @@ app.use('/api', teamRoutes);
 
 // Invitation routes
 app.use('/api', invitationRoutes);
+
+// Audit routes
+app.use('/api/audit', auditRoutes);
+
+// Public API (API key auth)
+app.use('/api/v1', publicSecretsRoutes);
+app.use('/api', apiKeysRoutes);
+app.use('/api', tokensRoutes);
 
 // Protected route example
 app.get('/api/me', requireAuth, (req: AuthRequest, res) => {

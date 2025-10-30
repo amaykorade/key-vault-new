@@ -119,6 +119,47 @@ export interface UpdateProjectMemberRoleRequest {
   role: ProjectRole;
 }
 
+// Audit types
+export interface AuditLog {
+  id: string;
+  userId?: string;
+  organizationId?: string;
+  projectId?: string;
+  secretId?: string;
+  eventType: string;
+  action: string;
+  resourceName?: string;
+  description?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  createdAt: string;
+  user?: {
+    id: string;
+    name?: string;
+    email: string;
+  };
+  organization?: {
+    id: string;
+    name: string;
+  };
+  project?: {
+    id: string;
+    name: string;
+  };
+  secret?: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface AuditFilters {
+  organizationId?: string;
+  projectId?: string;
+  eventType?: string;
+  limit?: number;
+  offset?: number;
+}
+
 // Secret types
 export type SecretType = 
   | 'API_KEY'

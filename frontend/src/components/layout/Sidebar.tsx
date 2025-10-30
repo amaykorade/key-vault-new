@@ -4,9 +4,9 @@ import { ROUTES } from '../../constants';
 import { useLayoutStore } from '../../stores/layout';
 import { useAuthStore } from '../../stores/auth';
 
-function navLinkClass({ isActive }: { isActive: boolean }) {
+function navLinkClass({ isActive, collapsed }: { isActive: boolean; collapsed?: boolean }) {
   return (
-    'flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 hover-lift ' +
+    `flex items-center ${collapsed ? 'justify-center px-2' : 'px-4'} py-3 rounded-lg text-sm font-medium transition-all duration-200 hover-lift ` +
     (isActive
       ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg'
       : 'text-gray-300 hover:bg-gray-800 hover:text-white')
@@ -19,6 +19,7 @@ export function Sidebar() {
   const { user, logout } = useAuthStore();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const [apiOpen, setApiOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -53,7 +54,7 @@ export function Sidebar() {
   }, [showUserMenu]);
 
   return (
-    <aside className={`hidden lg:block ${collapsed ? 'w-16' : 'w-64'} transition-all duration-300 bg-gray-900/50 backdrop-blur-sm h-screen sticky top-0 border-r border-gray-800 flex flex-col overflow-y-auto`}>
+    <aside className={`hidden lg:block ${collapsed ? 'w-16' : 'w-64'} flex-none transition-all duration-300 bg-gray-900/50 backdrop-blur-sm h-screen sticky top-0 border-r border-gray-800 flex flex-col overflow-y-auto`}>
       {/* Brand/Logo Section */}
       <div className="p-4 border-b border-gray-800">
         <div className="flex items-center justify-between">
@@ -75,7 +76,7 @@ export function Sidebar() {
             onClick={toggleSidebar}
             aria-label="Toggle sidebar"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`${collapsed ? 'w-6 h-6' : 'w-5 h-5'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {collapsed ? (
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               ) : (
@@ -88,34 +89,52 @@ export function Sidebar() {
       
       <div className="flex flex-col flex-1">
         <nav className="p-4 space-y-2">
-          <NavLink to={ROUTES.DASHBOARD} className={navLinkClass}>
-            <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <NavLink to={ROUTES.DASHBOARD} className={({isActive}) => navLinkClass({ isActive, collapsed })}>
+            <svg className={`${collapsed ? 'w-6 h-6' : 'w-5 h-5 mr-3'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z" />
             </svg>
             {!collapsed && <span>Dashboard</span>}
           </NavLink>
-          <NavLink to={ROUTES.ORGANIZATIONS} className={navLinkClass}>
-            <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <NavLink to={ROUTES.ORGANIZATIONS} className={({isActive}) => navLinkClass({ isActive, collapsed })}>
+            <svg className={`${collapsed ? 'w-6 h-6' : 'w-5 h-5 mr-3'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
-            {!collapsed && <span>Organizations</span>}
+            {!collapsed && <span>Workspaces</span>}
           </NavLink>
-          <NavLink to={ROUTES.PROJECTS} className={navLinkClass}>
-            <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z" />
+          <NavLink
+            to={ROUTES.API}
+            className={({isActive}) => navLinkClass({ isActive, collapsed })}
+            onClick={() => { if (collapsed) return; setApiOpen((o) => !o); }}
+          >
+            <svg className={`${collapsed ? 'w-6 h-6' : 'w-5 h-5 mr-3'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            {!collapsed && <span>Projects</span>}
+            {!collapsed && (
+              <span className="flex-1 flex items-center justify-between">
+                <span>API</span>
+                <svg className={`w-4 h-4 transition-transform ${apiOpen ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </span>
+            )}
           </NavLink>
-          <NavLink to={ROUTES.SECRETS} className={navLinkClass}>
-            <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+          {apiOpen && !collapsed && (
+            <NavLink to={ROUTES.API_TOKENS} className={({isActive}) => `${navLinkClass({ isActive, collapsed })} ${collapsed ? '' : 'ml-6 text-sm'}`}>
+              <svg className={`${collapsed ? 'w-5 h-5' : 'w-4 h-4 mr-3'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0-1.657 1.343-3 3-3s3 1.343 3 3-1.343 3-3 3-3-1.343-3-3zm-7 8l4-4m0 0l-4-4m4 4H3" />
+              </svg>
+              {!collapsed && <span>Tokens</span>}
+            </NavLink>
+          )}
+          <NavLink to={ROUTES.AUDIT} className={({isActive}) => navLinkClass({ isActive, collapsed })}>
+            <svg className={`${collapsed ? 'w-6 h-6' : 'w-5 h-5 mr-3'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
-            {!collapsed && <span>Secrets</span>}
+            {!collapsed && <span>Audit Logs</span>}
           </NavLink>
-          <NavLink to={ROUTES.SETTINGS} className={navLinkClass}>
-            <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <NavLink to={ROUTES.SETTINGS} className={({isActive}) => navLinkClass({ isActive, collapsed })}>
+            <svg className={`${collapsed ? 'w-6 h-6' : 'w-5 h-5 mr-3'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
@@ -127,7 +146,7 @@ export function Sidebar() {
         <div className="mt-auto p-4 border-t border-gray-800 relative" ref={userMenuRef}>
         <button
           onClick={() => setShowUserMenu(!showUserMenu)}
-          className="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-800 transition-all duration-200 group"
+          className={`w-full flex items-center ${collapsed ? 'justify-center' : ''} space-x-3 p-3 rounded-lg hover:bg-gray-800 transition-all duration-200 group`}
         >
           <div className="w-8 h-8 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-full flex items-center justify-center text-white font-medium text-sm">
             {user?.image ? (

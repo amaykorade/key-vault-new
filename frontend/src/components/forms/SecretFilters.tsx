@@ -12,6 +12,7 @@ interface SecretFiltersProps {
   onFolderChange: (folder: string) => void;
   onClearFilters: () => void;
   existingFolders?: string[];
+  showHeader?: boolean;
 }
 
 const ENVIRONMENTS = [
@@ -60,6 +61,7 @@ export function SecretFilters({
   onFolderChange,
   onClearFilters,
   existingFolders = [],
+  showHeader = true,
 }: SecretFiltersProps) {
   const hasActiveFilters = searchQuery || selectedEnvironment !== 'all' || selectedType !== 'all' || selectedFolder !== 'all';
 
@@ -78,22 +80,24 @@ export function SecretFilters({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-white">Filter Secrets</h3>
-        {hasActiveFilters && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onClearFilters}
-            className="text-gray-400 hover:text-gray-300 hover:bg-gray-800/50 transition-all duration-200"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            Clear All
-          </Button>
-        )}
-      </div>
+      {showHeader && (
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-white">Filter Secrets</h3>
+          {hasActiveFilters && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onClearFilters}
+              className="text-gray-400 hover:text-gray-300 hover:bg-gray-800/50 transition-all duration-200"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Clear All
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Search Bar */}
       <div className="relative group">

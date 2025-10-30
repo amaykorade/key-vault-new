@@ -12,7 +12,9 @@ import type {
   Secret,
   CreateSecretRequest,
   UpdateSecretRequest,
-  SecretSearchParams
+  SecretSearchParams,
+  AuditLog,
+  AuditFilters
 } from '../types';
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
@@ -242,6 +244,32 @@ class ApiService {
     return this.request<{ secret: Secret }>(`/secrets/${id}?${params.toString()}`);
   }
 
+  // Tokens (PAT)
+  async createTokenForProject(projectId: string): Promise<{ token: string; tokenMeta: any }> {
+    return this.request<{ token: string; tokenMeta: any }>(`/tokens`, {
+      method: 'POST',
+      body: JSON.stringify({ name: `token-${Date.now()}`, projects: [projectId] }),
+    });
+  }
+
+  async listTokens(): Promise<{ tokens: Array<{ id: string; name: string; createdAt: string; expiresAt?: string | null; lastUsedAt?: string | null; projectId?: string | null; projectName?: string | null }> }> {
+    return this.request(`/tokens`);
+  }
+
+  async revokeToken(id: string): Promise<void> {
+    return this.request<void>(`/tokens/${id}`, { method: 'DELETE' });
+  }
+
+  async regenerateToken(id: string): Promise<{ token: string }> {
+    return this.request<{ token: string }>(`/tokens/${id}/regenerate`, { method: 'POST' });
+  }
+
+  // User projects for dropdown
+  async getMyProjects(): Promise<{ projects: Array<{ id: string; name: string }> }> {
+    const res = await this.request<{ projects: Array<{ id: string; name: string }> }>(`/projects`);
+    return { projects: res.projects.map((p: any) => ({ id: p.id, name: p.name })) };
+  }
+
   async createSecret(projectId: string, data: CreateSecretRequest): Promise<{ secret: Secret }> {
     return this.request<{ secret: Secret }>(`/secrets/projects/${projectId}/secrets`, {
       method: 'POST',
@@ -404,6 +432,50 @@ class ApiService {
     return this.request<{ invitation: any }>(`/invitations/${invitationId}/resend`, {
       method: 'POST',
     });
+  }
+
+  // Audit methods
+  async getAuditLogs(filters: AuditFilters = {}): Promise<{ logs: AuditLog[]; total: number }> {
+    const params = new URLSearchParams();
+    if (filters.organizationId) params.append('organizationId', filters.organizationId);
+    if (filters.projectId) params.append('projectId', filters.projectId);
+    if (filters.eventType) params.append('eventType', filters.eventType);
+    if (filters.limit) params.append('limit', filters.limit.toString());
+    if (filters.offset) params.append('offset', filters.offset.toString());
+
+    return this.request<{ logs: AuditLog[]; total: number }>(`/audit/logs?${params.toString()}`);
+  }
+
+  async getRecentActivity(organizationId?: string, limit: number = 20): Promise<{ logs: AuditLog[] }> {
+    const params = new URLSearchParams();
+    if (organizationId) params.append('organizationId', organizationId);
+    params.append('limit', limit.toString());
+
+    return this.request<{ logs: AuditLog[] }>(`/audit/recent?${params.toString()}`);
+  }
+
+  async getSecurityEvents(organizationId?: string, limit: number = 20): Promise<{ logs: AuditLog[] }> {
+    const params = new URLSearchParams();
+    if (organizationId) params.append('organizationId', organizationId);
+    params.append('limit', limit.toString());
+
+    return this.request<{ logs: AuditLog[] }>(`/audit/security?${params.toString()}`);
+  }
+
+  async getUserActivity(userId: string, limit: number = 50): Promise<{ logs: AuditLog[] }> {
+    return this.request<{ logs: AuditLog[] }>(`/audit/user/${userId}?limit=${limit}`);
+  }
+
+  async getOrganizationActivity(organizationId: string, limit: number = 50, offset: number = 0): Promise<{ logs: AuditLog[] }> {
+    return this.request<{ logs: AuditLog[] }>(`/audit/organization/${organizationId}?limit=${limit}&offset=${offset}`);
+  }
+
+  async getProjectActivity(projectId: string, limit: number = 50, offset: number = 0): Promise<{ logs: AuditLog[] }> {
+    return this.request<{ logs: AuditLog[] }>(`/audit/project/${projectId}?limit=${limit}&offset=${offset}`);
+  }
+
+  async getSecretAccessHistory(secretId: string, limit: number = 50, offset: number = 0): Promise<{ logs: AuditLog[] }> {
+    return this.request<{ logs: AuditLog[] }>(`/audit/secret/${secretId}?limit=${limit}&offset=${offset}`);
   }
 
   // Utility methods

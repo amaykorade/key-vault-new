@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Users, UserPlus, MoreVertical, Crown, Shield, Edit, Eye, Trash2 } from 'lucide-react';
+import { MoreVertical, Crown, Shield, Edit, Eye, Trash2 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/Card';
 import { ShareProjectModal } from './ShareProjectModal';
@@ -26,6 +26,14 @@ export const ProjectMembersSection: React.FC<ProjectMembersSectionProps> = ({
   const [showShareModal, setShowShareModal] = useState(false);
   const [showRoleMenu, setShowRoleMenu] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem(`pm_collapsed:${projectId}`);
+      return stored ? stored === 'true' : true; // default collapsed
+    } catch {
+      return true;
+    }
+  });
 
   useEffect(() => {
     fetchMembers();
@@ -92,89 +100,125 @@ export const ProjectMembersSection: React.FC<ProjectMembersSectionProps> = ({
 
   const getRoleBadge = (role: ProjectRole) => {
     const colors = {
-      OWNER: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-      ADMIN: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-      WRITE: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-      READ: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+      OWNER: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+      ADMIN: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+      WRITE: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+      READ: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
     };
     return colors[role];
   };
 
   return (
     <>
-      <Card className="overflow-visible">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5" />
-            Project Members ({members.length})
-          </CardTitle>
-          {canManageMembers && (
-            <Button
-              onClick={() => setShowShareModal(true)}
-              size="sm"
-              className="flex items-center gap-2"
+      <Card className="overflow-visible hover-lift">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => {
+                const next = !isCollapsed;
+                setIsCollapsed(next);
+                try { localStorage.setItem(`pm_collapsed:${projectId}`, String(next)); } catch {}
+              }}
+              className="flex items-center flex-1 text-left hover:opacity-80 transition-opacity"
             >
-              <UserPlus className="w-4 h-4" />
-              Add Member
-            </Button>
-          )}
+              <CardTitle className="text-white text-sm font-semibold flex items-center">
+                <svg 
+                  className={`w-4 h-4 mr-2 text-indigo-400 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                <svg className="w-4 h-4 mr-2 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 0 9.288 0M15 7a3 3 0 1-6 0 3 3 0 0 6 0zm6 3a2 2 0 1-4 0 2 2 0 0 4 0zM7 10a2 2 0 1-4 0 2 2 0 0 4 0z" />
+                </svg>
+                Project Members
+                {!isCollapsed && members.length > 0 && (
+                  <span className="ml-2 px-2 py-0.5 bg-gray-700 text-gray-300 text-xs rounded-full">
+                    {members.length}
+                  </span>
+                )}
+              </CardTitle>
+            </button>
+            {!isCollapsed && canManageMembers && (
+              <Button
+                variant="gradient"
+                size="sm"
+                onClick={() => setShowShareModal(true)}
+                className="flex items-center space-x-2 shadow-lg"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                </svg>
+                <span>Add Member</span>
+              </Button>
+            )}
+          </div>
         </CardHeader>
 
-        <CardContent className="overflow-visible">
+        {!isCollapsed && (
+        <CardContent className="overflow-visible pt-0">
           {loading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="text-sm text-gray-500 mt-2">Loading members...</p>
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="animate-pulse bg-gray-800 rounded-lg p-3 h-12"></div>
+              ))}
             </div>
           ) : members.length === 0 ? (
-            <div className="text-center py-8">
-              <Users className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-500 dark:text-gray-400">No members yet</p>
+            <div className="text-center py-10">
+              <svg className="w-10 h-10 mx-auto mb-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 09.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              <p className="text-gray-400 mb-3 text-sm">No members yet</p>
               {canManageMembers && (
                 <Button
-                  onClick={() => setShowShareModal(true)}
+                  variant="gradient"
                   size="sm"
-                  variant="outline"
-                  className="mt-3"
+                  onClick={() => setShowShareModal(true)}
+                  className="shadow-lg"
                 >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                  </svg>
                   Add First Member
                 </Button>
               )}
             </div>
           ) : (
-            <div className="space-y-3 relative">
+            <div className="space-y-2 relative">
               {members.map((member) => (
                 <div
                   key={member.id}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-900 relative"
+                  className="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg border border-gray-700/50 hover:border-gray-600/50 transition-all relative"
                   style={{ zIndex: showRoleMenu === member.id ? 80 : 1 }}
                 >
-                  {/* Avatar */}
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-medium">
-                    {member.user.name?.[0] || member.user.email[0].toUpperCase()}
+                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                    {/* Avatar */}
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-600 to-gray-700 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                      {member.user.name?.[0]?.toUpperCase() || member.user.email[0].toUpperCase()}
+                    </div>
+
+                    {/* User Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2">
+                        <p className="font-medium text-white truncate text-sm">
+                          {member.user.name || 'Unknown'}
+                        </p>
+                        {member.user.id === currentUserId && (
+                          <span className="text-xs px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full border border-emerald-500/30">You</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-400 truncate">{member.user.email}</p>
+                    </div>
                   </div>
 
-                  {/* User Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900 dark:text-white truncate">
-                        {member.user.name || 'No name'}
-                      </span>
-                      {member.user.id === currentUserId && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">(You)</span>
-                      )}
-                    </div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                      {member.user.email}
-                    </div>
-                  </div>
-
-                  {/* Role Badge */}
-                  <div>
+                  {/* Role Badge & Menu */}
+                  <div className="flex items-center space-x-2 flex-shrink-0">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (canManageMembers) {
+                        if (canManageMembers && member.user.id !== currentUserId) {
                           if (showRoleMenu === member.id) {
                             setShowRoleMenu(null);
                             setMenuPosition(null);
@@ -188,8 +232,8 @@ export const ProjectMembersSection: React.FC<ProjectMembersSectionProps> = ({
                           }
                         }
                       }}
-                      className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium ${getRoleBadge(member.role)} ${
-                        canManageMembers ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
+                      className={`flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${getRoleBadge(member.role)} ${
+                        canManageMembers && member.user.id !== currentUserId ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
                       }`}
                     >
                       {getRoleIcon(member.role)}
@@ -204,6 +248,7 @@ export const ProjectMembersSection: React.FC<ProjectMembersSectionProps> = ({
             </div>
           )}
         </CardContent>
+        )}
       </Card>
 
       {/* Role Menu Portal - Renders at document.body level */}
@@ -219,14 +264,14 @@ export const ProjectMembersSection: React.FC<ProjectMembersSectionProps> = ({
           />
           <div 
             onClick={(e) => e.stopPropagation()}
-            className="fixed w-48 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 py-1"
+            className="fixed w-48 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 py-1"
             style={{ 
               top: `${menuPosition.top}px`,
               left: `${menuPosition.left}px`,
               zIndex: 9999,
             }}
           >
-            <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+            <div className="px-3 py-2 text-xs font-semibold text-gray-400 border-b border-gray-700">
               Change Role
             </div>
             {(['OWNER', 'ADMIN', 'WRITE', 'READ'] as ProjectRole[]).map((role) => {
@@ -240,19 +285,21 @@ export const ProjectMembersSection: React.FC<ProjectMembersSectionProps> = ({
                     }
                   }}
                   disabled={currentMember?.role === role}
-                  className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 ${
-                    currentMember?.role === role ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'text-gray-700 dark:text-gray-300'
-                  }`}
+                  className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 transition-colors ${
+                    currentMember?.role === role ? 'text-emerald-400 bg-emerald-500/10' : 'text-gray-300'
+                  } disabled:cursor-not-allowed`}
                 >
                   {getRoleIcon(role)}
                   {role}
                   {currentMember?.role === role && (
-                    <span className="ml-auto text-xs">✓</span>
+                    <svg className="ml-auto w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
                   )}
                 </button>
               );
             })}
-            <div className="border-t border-gray-200 dark:border-gray-700 mt-1"></div>
+            <div className="border-t border-gray-700 mt-1"></div>
             <button
               onClick={() => {
                 const currentMember = members.find(m => m.id === showRoleMenu);
@@ -260,10 +307,10 @@ export const ProjectMembersSection: React.FC<ProjectMembersSectionProps> = ({
                   handleRemoveMember(currentMember.user.id, currentMember.user.name || currentMember.user.email);
                 }
               }}
-              className="w-full px-3 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+              className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-red-900/20 flex items-center gap-2 transition-colors"
             >
               <Trash2 className="w-4 h-4" />
-              Remove
+              Remove Member
             </button>
           </div>
         </>

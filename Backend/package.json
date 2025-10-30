@@ -8,6 +8,7 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.0.2",
     "@prisma/client": "^6.15.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/express-session": "^1.18.2",

@@ -138,7 +138,7 @@ export const TeamDetailsPage: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl flex items-center justify-center">
+          <div className="w-16 h-16 bg-gradient-to-r from-gray-600 to-gray-700 rounded-xl flex items-center justify-center">
             <span className="text-white font-bold text-2xl">
               {currentTeam.name.charAt(0).toUpperCase()}
             </span>

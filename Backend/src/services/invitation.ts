@@ -10,9 +10,9 @@ export const InvitationSchema = {
     teamRole: z.enum(['LEAD', 'MEMBER']).optional(),
   }),
   accept: z.object({
-    name: z.string().min(1, 'Name is required').optional(),
-    password: z.string().min(8, 'Password must be at least 8 characters').optional(),
-  }),
+    name: z.string().optional(),
+    password: z.string().optional(),
+  })
 };
 
 export class InvitationService {
@@ -225,7 +225,7 @@ export class InvitationService {
         },
       },
     });
-
+    
     if (!invitation) {
       throw new Error('Invalid or expired invitation');
     }
@@ -536,7 +536,7 @@ export class InvitationService {
     const newToken = this.generateInvitationToken();
     const newExpiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000); // 14 days
 
-    return await db.invitation.update({
+    const updatedInvitation = await db.invitation.update({
       where: { id: invitationId },
       data: {
         token: newToken,
@@ -566,5 +566,24 @@ export class InvitationService {
         },
       },
     });
+
+    // Send the invitation email
+    try {
+      await EmailService.sendTeamInvitationEmail({
+        inviteeEmail: updatedInvitation.email,
+        inviterName: updatedInvitation.invitedBy.name || updatedInvitation.invitedBy.email,
+        organizationName: updatedInvitation.organization.name,
+        teamName: updatedInvitation.team?.name,
+        role: updatedInvitation.role,
+        teamRole: updatedInvitation.teamRole || undefined,
+        invitationToken: newToken,
+        expiresAt: newExpiresAt,
+      });
+    } catch (emailError) {
+      console.error('Failed to send resend invitation email:', emailError);
+      // Don't fail the request if email fails, invitation is already updated
+    }
+
+    return updatedInvitation;
   }
 }

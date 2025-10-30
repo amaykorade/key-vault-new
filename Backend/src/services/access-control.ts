@@ -118,12 +118,10 @@ export class AccessControlService {
     }
 
     // Get project membership separately
-    const projectMembership = await (db as any).projectMember.findUnique({
+    const projectMembership = await (db as any).projectMember.findFirst({
       where: {
-        projectId_userId: {
-          projectId,
-          userId,
-        },
+        projectId,
+        userId,
       },
       select: { role: true },
     });

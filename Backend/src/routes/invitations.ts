@@ -168,8 +168,13 @@ router.get('/invitations/:token', async (req, res) => {
 router.post('/invitations/:token/accept', async (req, res) => {
   try {
     const { token } = req.params;
+    console.log('📧 Accepting invitation with token:', token.substring(0, 16) + '...');
+    console.log('📧 Request body:', req.body);
+    
     const data = InvitationSchema.accept.parse(req.body);
     const result = await InvitationService.acceptInvitation(token, data);
+    
+    console.log('✅ Invitation accepted successfully for:', result.user.email);
     
     res.json({
       user: {
@@ -181,7 +186,13 @@ router.post('/invitations/:token/accept', async (req, res) => {
       team: result.invitation.team,
     });
   } catch (error) {
-    console.error('Accept invitation error:', error);
+    console.error('❌ Accept invitation error:', error);
+    console.error('Error details:', {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    
     if (error instanceof Error && error.name === 'ZodError') {
       const zodError = error as any;
       return res.status(400).json({ 
@@ -201,7 +212,7 @@ router.post('/invitations/:token/accept', async (req, res) => {
         return res.status(400).json({ error: error.message });
       }
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
   }
 });
 
