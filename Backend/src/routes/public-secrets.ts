@@ -101,10 +101,10 @@ async function handler(req: ApiRequest, res: any) {
   }
 }
 
-// Ultra-simple endpoint - only token + secret name needed
-// GET /api/v1/secrets/:name
+// Simple endpoint - only token + secret name needed
+// GET /api/v1/{secretName}
 // Token determines project, environment, and folder automatically
-router.get('/simple/:name', async (req: ApiRequest, res, next) => {
+router.get('/:name', async (req: ApiRequest, res, next) => {
   const hasBearer = !!((req.header('authorization') || req.header('Authorization')) || '').toLowerCase().startsWith('bearer ');
   if (hasBearer) return (requireUserApiToken as any)(req, res, () => simpleHandler(req, res));
   return res.status(401).json({ error: 'Missing Bearer token' });

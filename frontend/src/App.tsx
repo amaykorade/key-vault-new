@@ -13,7 +13,6 @@ import { TeamsPage } from './pages/TeamsPage';
 import { InvitationAcceptPage } from './pages/InvitationAcceptPage';
 import { AuditPage } from './pages/AuditPage';
 import { ApiPage } from './pages/ApiPage';
-import { TokensPage } from './pages/TokensPage';
 import { ROUTES } from './constants';
 import { FolderPage } from './pages/FolderPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
@@ -104,17 +103,6 @@ function App() {
               <ProtectedRoute>
                 <AppLayout>
                   <ApiPage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path={ROUTES.API_TOKENS}
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <TokensPage />
                 </AppLayout>
               </ProtectedRoute>
             }

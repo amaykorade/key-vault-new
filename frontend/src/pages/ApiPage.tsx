@@ -1,28 +1,9 @@
-import { useState, useEffect } from 'react';
-import { useOrganizationsStore } from '../stores/organizations';
-import { apiService } from '../services/api';
+import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 
 export function ApiPage() {
-  const { currentOrganization } = useOrganizationsStore();
   const [copiedExample, setCopiedExample] = useState<string | null>(null);
-  const [tokens, setTokens] = useState<any[]>([]);
   const [activeLanguage, setActiveLanguage] = useState<'curl' | 'node' | 'python' | 'go'>('curl');
-
-  useEffect(() => {
-    if (currentOrganization?.id) {
-      fetchTokens();
-    }
-  }, [currentOrganization?.id]);
-
-  async function fetchTokens() {
-    try {
-      const res = await apiService.listTokens();
-      setTokens(res.tokens || []);
-    } catch (e) {
-      console.error('Failed to fetch tokens:', e);
-    }
-  }
 
   const copyToClipboard = (text: string, example: string) => {
     navigator.clipboard.writeText(text);
@@ -36,11 +17,11 @@ export function ApiPage() {
   const codeExamples = {
     curl: `# Get a secret (returns plain text value)
 curl -H "Authorization: Bearer YOUR_TOKEN" \\
-  "${apiUrl}/simple/DATABASE_URL"
+  "${apiUrl}/DATABASE_URL"
 
 # Get with metadata (JSON format)
 curl -H "Authorization: Bearer YOUR_TOKEN" \\
-  "${apiUrl}/simple/DATABASE_URL?format=json"`,
+  "${apiUrl}/DATABASE_URL?format=json"`,
 
     node: `const axios = require('axios');
 
@@ -50,7 +31,7 @@ const apiUrl = '${apiUrl}';
 // Simple function to get any secret
 async function getSecret(name) {
   const response = await axios.get(
-    \`\${apiUrl}/simple/\${name}\`,
+    \`\${apiUrl}/\${name}\`,
     { headers: { 'Authorization': \`Bearer \${token}\` } }
   );
   return response.data;
@@ -83,7 +64,7 @@ def get_secret(name: str) -> str:
     Token scope determines project/environment/folder automatically.
     """
     response = requests.get(
-        f"{API_URL}/simple/{name}",
+        f"{API_URL}/{name}",
         headers={"Authorization": f"Bearer {TOKEN}"}
     )
     response.raise_for_status()
@@ -118,7 +99,7 @@ var (
 // GetSecret fetches a secret from the vault
 // Token scope determines project/environment/folder automatically
 func GetSecret(name string) (string, error) {
-    url := fmt.Sprintf("%s/simple/%s", apiURL, name)
+    url := fmt.Sprintf("%s/%s", apiURL, name)
     
     req, err := http.NewRequest("GET", url, nil)
     if err != nil {
@@ -295,7 +276,7 @@ func main() {
               <div className="flex items-center gap-2 mb-2">
                 <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded">GET</span>
                 <code className="text-emerald-300 text-base font-mono font-semibold">
-                  /simple/{'{secretName}'}
+                  /{'{secretName}'}
                 </code>
               </div>
               <div className="mt-3 space-y-1 text-xs">
@@ -330,57 +311,32 @@ func main() {
         <CardHeader>
           <CardTitle className="text-white">Authentication</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Token Info */}
-            <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
-              <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-                <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                </svg>
-                Personal Access Tokens
-              </h4>
-              <ul className="space-y-2 text-xs text-gray-400">
-                <li className="flex items-start gap-2">
-                  <span className="text-emerald-400 mt-0.5">•</span>
-                  <span>Created per folder (scoped to specific environment/folder)</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-emerald-400 mt-0.5">•</span>
-                  <span>Supports read/write permissions</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-emerald-400 mt-0.5">•</span>
-                  <span>Optional expiration dates</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-emerald-400 mt-0.5">•</span>
-                  <span>IP allowlisting supported</span>
-                </li>
-              </ul>
-            </div>
-
-            {/* Your Tokens */}
-            <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
-              <h4 className="text-sm font-semibold text-white mb-3">Your Active Tokens</h4>
-              {tokens.length === 0 ? (
-                <div className="text-center py-4">
-                  <p className="text-xs text-gray-500 mb-2">No tokens created yet</p>
-                  <p className="text-xs text-gray-600">Create one from a folder's Access tab</p>
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  {tokens.map((token) => (
-                    <div key={token.id} className="flex items-center justify-between text-xs p-2 bg-gray-900/50 rounded border border-gray-700/50">
-                      <span className="text-gray-300 font-mono truncate flex-1">{token.name}</span>
-                      <span className="text-gray-500 text-xs ml-2">
-                        {token.lastUsedAt ? '🟢' : '⚪'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+        <CardContent>
+          <div className="bg-gray-800/50 rounded-lg p-5 border border-gray-700">
+            <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+              <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
+              Personal Access Tokens
+            </h4>
+            <ul className="space-y-2.5 text-sm text-gray-300">
+              <li className="flex items-start gap-3">
+                <span className="text-emerald-400 mt-1 text-lg">•</span>
+                <span>Created per folder (scoped to specific environment/folder)</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="text-emerald-400 mt-1 text-lg">•</span>
+                <span>Supports read/write permissions</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="text-emerald-400 mt-1 text-lg">•</span>
+                <span>Optional expiration dates</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="text-emerald-400 mt-1 text-lg">•</span>
+                <span>IP allowlisting supported</span>
+              </li>
+            </ul>
           </div>
         </CardContent>
       </Card>
@@ -457,7 +413,7 @@ func main() {
             <div>
               <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Endpoint</h4>
               <code className="block px-3 py-2 bg-gray-900 text-emerald-400 rounded-lg border border-gray-700 font-mono text-sm">
-                GET /simple/{'{secretName}'}
+                GET /{'{secretName}'}
               </code>
             </div>
             
@@ -656,7 +612,7 @@ env:
   
 run: |
   curl -H "Authorization: Bearer $DB_URL" \\
-    "$API_URL/simple/DATABASE_URL"`}</code>
+    "$API_URL/DATABASE_URL"`}</code>
               </pre>
             </div>
 
@@ -694,7 +650,7 @@ exec "$@"`}</code>
   command: [sh, -c]
   args:
   - curl -H "Authorization: Bearer..."
-    "$API_URL/simple/API_KEY" 
+    "$API_URL/API_KEY" 
     > /secrets/api_key`}</code>
               </pre>
             </div>
@@ -746,10 +702,10 @@ const config = {
                 <label className="text-xs text-gray-400 mb-1 block">2. Run this command in your terminal:</label>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 px-3 py-2 bg-gray-800 text-emerald-400 rounded text-xs font-mono overflow-x-auto">
-                    curl -H "Authorization: Bearer YOUR_TOKEN" "{apiUrl}/simple/DATABASE_URL"
+                    curl -H "Authorization: Bearer YOUR_TOKEN" "{apiUrl}/DATABASE_URL"
                   </code>
                   <button
-                    onClick={() => copyToClipboard(`curl -H "Authorization: Bearer YOUR_TOKEN" "${apiUrl}/simple/DATABASE_URL"`, 'test')}
+                    onClick={() => copyToClipboard(`curl -H "Authorization: Bearer YOUR_TOKEN" "${apiUrl}/DATABASE_URL"`, 'test')}
                     className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors text-xs"
                   >
                     {copiedExample === 'test' ? '✓' : 'Copy'}
