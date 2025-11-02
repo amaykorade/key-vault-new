@@ -25,7 +25,7 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = location.state?.from?.pathname || ROUTES.DASHBOARD;
+  const from = location.state?.from?.pathname || ROUTES.PROJECTS;
 
   const {
     register,

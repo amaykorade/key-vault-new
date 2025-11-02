@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { z } from 'zod';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { db } from '../lib/db';
+import { AuditService } from '../services/audit';
 
 const router = Router();
 
@@ -44,6 +45,34 @@ router.post('/tokens', requireAuth, async (req: AuthRequest, res) => {
       select: { id: true, name: true, createdAt: true, expiresAt: true },
     });
 
+    // Log token creation
+    const projectId = body.projects?.[0];
+    if (projectId) {
+      const scopes = (req.body as any).scopes || ['read', 'write'];
+      const ipAddress = req.ip || req.connection.remoteAddress;
+      const environment = body.environments?.[0];
+      const folder = body.folders?.[0];
+      
+      // Fetch project to get organizationId
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        select: { organizationId: true }
+      });
+      
+      await AuditService.logTokenCreate(
+        req.user!.id,
+        pat.id,
+        body.name,
+        projectId,
+        project?.organizationId,
+        environment,
+        folder,
+        scopes,
+        pat.expiresAt,
+        ipAddress
+      ).catch(console.error);
+    }
+
     res.status(201).json({ token, tokenMeta: pat });
   } catch (error: any) {
     if (error?.name === 'ZodError') return res.status(400).json({ error: 'Validation failed' });
@@ -79,7 +108,39 @@ router.get('/tokens', requireAuth, async (req: AuthRequest, res) => {
 
 // Revoke
 router.delete('/tokens/:id', requireAuth, async (req: AuthRequest, res) => {
-  await db.userApiToken.delete({ where: { id: req.params.id } });
+  const token = await db.userApiToken.findFirst({
+    where: { id: req.params.id, userId: req.user!.id },
+  });
+  
+  if (token) {
+    await db.userApiToken.delete({ where: { id: req.params.id } });
+    
+    // Log token revocation
+    const projectId = (token.projects as any)?.[0];
+    if (projectId) {
+      const ipAddress = req.ip || req.connection.remoteAddress;
+      const environment = (token.environments as any)?.[0];
+      const folder = (token.folders as any)?.[0];
+      
+      // Fetch project to get organizationId
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        select: { organizationId: true }
+      });
+      
+      await AuditService.logTokenRevoke(
+        req.user!.id,
+        token.id,
+        token.name,
+        projectId,
+        project?.organizationId,
+        environment,
+        folder,
+        ipAddress
+      ).catch(console.error);
+    }
+  }
+  
   res.status(204).send();
 });
 

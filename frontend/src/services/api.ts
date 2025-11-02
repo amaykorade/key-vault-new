@@ -245,10 +245,24 @@ class ApiService {
   }
 
   // Tokens (PAT)
-  async createTokenForProject(projectId: string): Promise<{ token: string; tokenMeta: any }> {
+  async createTokenForProject(
+    projectId: string,
+    options?: { 
+      name?: string; 
+      scopes?: Array<'read' | 'write'>; 
+      expiresInMinutes?: number;
+      environment?: string;
+      folder?: string;
+    }
+  ): Promise<{ token: string; tokenMeta: any }> {
+    const body: any = { name: options?.name || `token-${Date.now()}`, projects: [projectId] };
+    if (options?.scopes) body.scopes = options.scopes;
+    if (typeof options?.expiresInMinutes === 'number') body.expiresInMinutes = options.expiresInMinutes;
+    if (options?.environment) body.environments = [options.environment];
+    if (options?.folder) body.folders = [options.folder];
     return this.request<{ token: string; tokenMeta: any }>(`/tokens`, {
       method: 'POST',
-      body: JSON.stringify({ name: `token-${Date.now()}`, projects: [projectId] }),
+      body: JSON.stringify(body),
     });
   }
 
@@ -476,6 +490,10 @@ class ApiService {
 
   async getSecretAccessHistory(secretId: string, limit: number = 50, offset: number = 0): Promise<{ logs: AuditLog[] }> {
     return this.request<{ logs: AuditLog[] }>(`/audit/secret/${secretId}?limit=${limit}&offset=${offset}`);
+  }
+
+  async getFolderLogs(projectId: string, environment: string, folder: string, limit: number = 50, offset: number = 0): Promise<{ logs: AuditLog[] }> {
+    return this.request<{ logs: AuditLog[] }>(`/audit/folder/${projectId}/${encodeURIComponent(environment)}/${encodeURIComponent(folder)}?limit=${limit}&offset=${offset}`);
   }
 
   // Utility methods

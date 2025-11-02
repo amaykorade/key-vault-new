@@ -17,7 +17,7 @@ export function AuthCallbackPage() {
       apiService.applyTokens(accessToken, refreshToken);
       // Fetch current user and redirect
       setUserAfterToken().finally(() => {
-        navigate(ROUTES.DASHBOARD, { replace: true });
+        navigate(ROUTES.PROJECTS, { replace: true });
       });
     } else {
       navigate(ROUTES.LOGIN, { replace: true });

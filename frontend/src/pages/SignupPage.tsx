@@ -51,7 +51,7 @@ export function SignupPage() {
         email: data.email,
         password: data.password,
       });
-      navigate(ROUTES.DASHBOARD, { replace: true });
+      navigate(ROUTES.PROJECTS, { replace: true });
     } catch (err) {
       // Error is handled by the auth store
     } finally {

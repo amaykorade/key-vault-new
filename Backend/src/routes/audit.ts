@@ -214,4 +214,38 @@ router.get('/secret/:secretId', async (req, res) => {
   }
 });
 
+/**
+ * GET /audit/folder/:projectId/:environment/:folder
+ * Get activity for a specific folder
+ */
+router.get('/folder/:projectId/:environment/:folder', async (req, res) => {
+  try {
+    const { projectId, environment, folder } = req.params;
+    const { limit = 50, offset = 0 } = req.query;
+    
+    console.log('Fetching folder logs:', { projectId, environment, folder, limit, offset });
+    
+    const logs = await AuditService.getFolderLogs(
+      projectId,
+      environment,
+      folder,
+      Number(limit),
+      Number(offset)
+    );
+    
+    console.log(`Found ${logs.length} logs for folder`);
+    
+    res.json({
+      success: true,
+      logs,
+    });
+  } catch (error: any) {
+    console.error('Failed to get folder logs:', error);
+    res.status(400).json({
+      success: false,
+      error: error.message || 'Failed to get folder logs',
+    });
+  }
+});
+
 export default router;

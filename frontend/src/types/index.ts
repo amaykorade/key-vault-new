@@ -126,9 +126,14 @@ export interface AuditLog {
   organizationId?: string;
   projectId?: string;
   secretId?: string;
+  tokenId?: string;
   eventType: string;
   action: string;
   resourceName?: string;
+  resourceType?: string;
+  environment?: string;
+  folder?: string;
+  metadata?: Record<string, any>;
   description?: string;
   ipAddress?: string;
   userAgent?: string;

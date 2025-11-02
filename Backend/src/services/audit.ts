@@ -5,9 +5,14 @@ export interface AuditEvent {
   organizationId?: string;
   projectId?: string;
   secretId?: string;
+  tokenId?: string;
   eventType: string;
   action: string;
   resourceName?: string;
+  resourceType?: string;
+  environment?: string;
+  folder?: string;
+  metadata?: Record<string, any>;
   description?: string;
   ipAddress?: string;
   userAgent?: string;
@@ -25,9 +30,14 @@ export class AuditService {
           organizationId: event.organizationId,
           projectId: event.projectId,
           secretId: event.secretId,
+          tokenId: event.tokenId,
           eventType: event.eventType,
           action: event.action,
           resourceName: event.resourceName,
+          resourceType: event.resourceType,
+          environment: event.environment,
+          folder: event.folder,
+          metadata: event.metadata || {},
           description: event.description,
           ipAddress: event.ipAddress,
           userAgent: event.userAgent,
@@ -73,16 +83,23 @@ export class AuditService {
     secretId: string,
     secretName: string,
     projectId: string,
-    action: 'view' | 'copy',
+    organizationId?: string,
+    environment?: string,
+    folder?: string,
+    action: 'view' | 'copy' = 'view',
     ipAddress?: string
   ): Promise<void> {
     await this.log({
       userId,
       secretId,
       projectId,
+      organizationId: organizationId || undefined,
       eventType: 'secret_access',
       action,
       resourceName: `Secret: ${secretName}`,
+      resourceType: 'secret',
+      environment,
+      folder,
       description: `User ${action}ed secret "${secretName}"`,
       ipAddress,
     });
@@ -93,20 +110,33 @@ export class AuditService {
     secretId: string,
     secretName: string,
     projectId: string,
-    organizationId: string,
+    organizationId?: string,
+    environment?: string,
+    folder?: string,
+    secretType?: string,
     ipAddress?: string
   ): Promise<void> {
+    console.log('AuditService.logSecretCreate called:', {
+      userId, secretId, secretName, projectId, organizationId, environment, folder, secretType
+    });
+    
     await this.log({
       userId,
       secretId,
       projectId,
-      organizationId,
+      organizationId: organizationId || undefined,
       eventType: 'secret_create',
       action: 'create',
       resourceName: `Secret: ${secretName}`,
-      description: `User created secret "${secretName}"`,
+      resourceType: 'secret',
+      environment,
+      folder,
+      metadata: { type: secretType },
+      description: `User created secret "${secretName}" in ${environment}/${folder}`,
       ipAddress,
     });
+    
+    console.log('AuditService.logSecretCreate completed');
   }
 
   static async logSecretUpdate(
@@ -114,18 +144,25 @@ export class AuditService {
     secretId: string,
     secretName: string,
     projectId: string,
-    organizationId: string,
+    organizationId?: string,
+    environment?: string,
+    folder?: string,
+    changedFields?: string[],
     ipAddress?: string
   ): Promise<void> {
     await this.log({
       userId,
       secretId,
       projectId,
-      organizationId,
+      organizationId: organizationId || undefined,
       eventType: 'secret_update',
       action: 'update',
       resourceName: `Secret: ${secretName}`,
-      description: `User updated secret "${secretName}"`,
+      resourceType: 'secret',
+      environment,
+      folder,
+      metadata: { changedFields: changedFields || [] },
+      description: `User updated secret "${secretName}" ${changedFields?.length ? `(${changedFields.join(', ')})` : ''}`,
       ipAddress,
     });
   }
@@ -135,18 +172,23 @@ export class AuditService {
     secretId: string,
     secretName: string,
     projectId: string,
-    organizationId: string,
+    organizationId?: string,
+    environment?: string,
+    folder?: string,
     ipAddress?: string
   ): Promise<void> {
     await this.log({
       userId,
       secretId,
       projectId,
-      organizationId,
+      organizationId: organizationId || undefined,
       eventType: 'secret_delete',
       action: 'delete',
       resourceName: `Secret: ${secretName}`,
-      description: `User deleted secret "${secretName}"`,
+      resourceType: 'secret',
+      environment,
+      folder,
+      description: `User deleted secret "${secretName}" from ${environment}/${folder}`,
       ipAddress,
     });
   }
@@ -254,7 +296,11 @@ export class AuditService {
     userId?: string;
     organizationId?: string;
     projectId?: string;
+    secretId?: string;
     eventType?: string;
+    environment?: string;
+    folder?: string;
+    resourceType?: string;
     limit?: number;
     offset?: number;
   }) {
@@ -263,7 +309,11 @@ export class AuditService {
     if (filters.userId) where.userId = filters.userId;
     if (filters.organizationId) where.organizationId = filters.organizationId;
     if (filters.projectId) where.projectId = filters.projectId;
+    if (filters.secretId) where.secretId = filters.secretId;
     if (filters.eventType) where.eventType = filters.eventType;
+    if (filters.environment) where.environment = filters.environment;
+    if (filters.folder) where.folder = filters.folder;
+    if (filters.resourceType) where.resourceType = filters.resourceType;
 
     const logs = await db.auditLog.findMany({
       where,
@@ -302,6 +352,83 @@ export class AuditService {
     });
 
     return logs;
+  }
+
+  /**
+   * Get folder-specific logs
+   */
+  static async getFolderLogs(
+    projectId: string,
+    environment: string,
+    folder: string,
+    limit: number = 50,
+    offset: number = 0
+  ) {
+    return this.getAuditLogs({
+      projectId,
+      environment,
+      folder,
+      limit,
+      offset,
+    });
+  }
+
+  /**
+   * Log token events
+   */
+  static async logTokenCreate(
+    userId: string,
+    tokenId: string,
+    tokenName: string,
+    projectId: string,
+    organizationId?: string,
+    environment?: string,
+    folder?: string,
+    scopes?: string[],
+    expiresAt?: Date | null,
+    ipAddress?: string
+  ): Promise<void> {
+    await this.log({
+      userId,
+      tokenId,
+      projectId,
+      organizationId: organizationId || undefined,
+      eventType: 'token_create',
+      action: 'create',
+      resourceName: `Token: ${tokenName}`,
+      resourceType: 'token',
+      environment,
+      folder,
+      metadata: { scopes, expiresAt: expiresAt?.toISOString() },
+      description: `User created service token "${tokenName}"${scopes ? ` with ${scopes.join(', ')} access` : ''}`,
+      ipAddress,
+    });
+  }
+
+  static async logTokenRevoke(
+    userId: string,
+    tokenId: string,
+    tokenName: string,
+    projectId: string,
+    organizationId?: string,
+    environment?: string,
+    folder?: string,
+    ipAddress?: string
+  ): Promise<void> {
+    await this.log({
+      userId,
+      tokenId,
+      projectId,
+      organizationId: organizationId || undefined,
+      eventType: 'token_revoke',
+      action: 'delete',
+      resourceName: `Token: ${tokenName}`,
+      resourceType: 'token',
+      environment,
+      folder,
+      description: `User revoked service token "${tokenName}"`,
+      ipAddress,
+    });
   }
 
   /**

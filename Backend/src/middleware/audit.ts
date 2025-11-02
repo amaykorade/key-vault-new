@@ -1,11 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuditService } from '../services/audit';
+import { db } from '../lib/db';
 
 export interface AuditRequest extends Request {
   user?: {
     id: string;
     email: string;
-    name?: string;
+    name?: string | null;
   };
 }
 
@@ -17,7 +18,7 @@ export const auditLog = (eventType: string, getResourceName?: (req: AuditRequest
     // Store original res.end to capture response
     const originalEnd = res.end;
     
-    res.end = function(chunk?: any, encoding?: any) {
+    res.end = function(chunk?: any, encoding?: any): any {
       // Only log successful requests (2xx status codes)
       if (res.statusCode >= 200 && res.statusCode < 300) {
         const userId = req.user?.id;
@@ -45,7 +46,7 @@ export const auditLog = (eventType: string, getResourceName?: (req: AuditRequest
       }
       
       // Call original end method
-      originalEnd.call(this, chunk, encoding);
+      return originalEnd.call(this, chunk, encoding);
     };
 
     next();
@@ -78,7 +79,7 @@ export const auditUserLogin = () => {
   return (req: AuditRequest, res: Response, next: NextFunction) => {
     const originalEnd = res.end;
     
-    res.end = function(chunk?: any, encoding?: any) {
+    res.end = function(chunk?: any, encoding?: any): any {
       if (res.statusCode >= 200 && res.statusCode < 300) {
         const userId = req.user?.id;
         const ipAddress = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
@@ -92,7 +93,7 @@ export const auditUserLogin = () => {
         ).catch(console.error);
       }
       
-      originalEnd.call(this, chunk, encoding);
+      return originalEnd.call(this, chunk, encoding);
     };
 
     next();
@@ -103,7 +104,7 @@ export const auditSecretAccess = () => {
   return (req: AuditRequest, res: Response, next: NextFunction) => {
     const originalEnd = res.end;
     
-    res.end = function(chunk?: any, encoding?: any) {
+    res.end = function(chunk?: any, encoding?: any): any {
       if (res.statusCode >= 200 && res.statusCode < 300) {
         const userId = req.user?.id;
         const secretId = req.params.secretId;
@@ -125,7 +126,7 @@ export const auditSecretAccess = () => {
         }
       }
       
-      originalEnd.call(this, chunk, encoding);
+      return originalEnd.call(this, chunk, encoding);
     };
 
     next();
@@ -136,12 +137,15 @@ export const auditSecretCreate = () => {
   return (req: AuditRequest, res: Response, next: NextFunction) => {
     const originalEnd = res.end;
     
-    res.end = function(chunk?: any, encoding?: any) {
+    res.end = function(chunk?: any, encoding?: any): any {
       if (res.statusCode >= 200 && res.statusCode < 300) {
         const userId = req.user?.id;
         const projectId = req.params.projectId;
         const organizationId = req.body?.organizationId;
         const secretName = req.body?.name;
+        const environment = req.body?.environment;
+        const folder = req.body?.folder;
+        const secretType = req.body?.type;
         const ipAddress = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
 
         if (userId && projectId && secretName) {
@@ -157,6 +161,9 @@ export const auditSecretCreate = () => {
                 secretName,
                 projectId,
                 organizationId || '',
+                environment,
+                folder,
+                secretType,
                 ipAddress
               ).catch(console.error);
             }
@@ -169,13 +176,16 @@ export const auditSecretCreate = () => {
               secretName,
               projectId,
               organizationId || '',
+              environment,
+              folder,
+              secretType,
               ipAddress
             ).catch(console.error);
           }
         }
       }
       
-      originalEnd.call(this, chunk, encoding);
+      return originalEnd.call(this, chunk, encoding);
     };
 
     next();
@@ -186,28 +196,40 @@ export const auditSecretUpdate = () => {
   return (req: AuditRequest, res: Response, next: NextFunction) => {
     const originalEnd = res.end;
     
-    res.end = function(chunk?: any, encoding?: any) {
+    res.end = function(chunk?: any, encoding?: any): any {
       if (res.statusCode >= 200 && res.statusCode < 300) {
         const userId = req.user?.id;
-        const secretId = req.params.secretId;
-        const projectId = req.params.projectId;
+        const secretId = req.params.id;
         const organizationId = req.body?.organizationId;
-        const secretName = req.body?.name;
         const ipAddress = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
 
-        if (userId && secretId && secretName) {
-          AuditService.logSecretUpdate(
-            userId,
-            secretId,
-            secretName,
-            projectId || '',
-            organizationId || '',
-            ipAddress
-          ).catch(console.error);
+        if (userId && secretId) {
+          // Parse response to get secret details
+          try {
+            const responseData = JSON.parse(chunk?.toString() || '{}');
+            const secret = responseData.secret;
+            const changedFields = Object.keys(req.body || {});
+            
+            if (secret) {
+              AuditService.logSecretUpdate(
+                userId,
+                secretId,
+                secret.name || 'Unknown',
+                secret.projectId || '',
+                organizationId || '',
+                secret.environment,
+                secret.folder,
+                changedFields,
+                ipAddress
+              ).catch(console.error);
+            }
+          } catch (error) {
+            console.error('Failed to parse response for audit logging:', error);
+          }
         }
       }
       
-      originalEnd.call(this, chunk, encoding);
+      return originalEnd.call(this, chunk, encoding);
     };
 
     next();
@@ -215,31 +237,44 @@ export const auditSecretUpdate = () => {
 };
 
 export const auditSecretDelete = () => {
-  return (req: AuditRequest, res: Response, next: NextFunction) => {
+  return async (req: AuditRequest, res: Response, next: NextFunction) => {
+    // Fetch secret details before deletion to get env/folder
+    let secretDetails: any = null;
+    try {
+      const secretId = req.params.id;
+      if (secretId) {
+        secretDetails = await db.secret.findUnique({
+          where: { id: secretId },
+          select: { name: true, environment: true, folder: true, projectId: true },
+        });
+      }
+    } catch (err) {
+      // Continue anyway
+    }
+
     const originalEnd = res.end;
     
-    res.end = function(chunk?: any, encoding?: any) {
+    res.end = function(chunk?: any, encoding?: any): any {
       if (res.statusCode >= 200 && res.statusCode < 300) {
         const userId = req.user?.id;
-        const secretId = req.params.secretId;
-        const projectId = req.params.projectId;
-        const organizationId = req.body?.organizationId;
-        const secretName = req.body?.name || 'Unknown Secret';
+        const secretId = req.params.id;
         const ipAddress = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
 
-        if (userId && secretId) {
+        if (userId && secretId && secretDetails) {
           AuditService.logSecretDelete(
             userId,
             secretId,
-            secretName,
-            projectId || '',
-            organizationId || '',
+            secretDetails.name || 'Unknown Secret',
+            secretDetails.projectId || '',
+            '',
+            secretDetails.environment,
+            secretDetails.folder,
             ipAddress
           ).catch(console.error);
         }
       }
       
-      originalEnd.call(this, chunk, encoding);
+      return originalEnd.call(this, chunk, encoding);
     };
 
     next();

@@ -296,11 +296,20 @@ model AuditLog {
   organizationId String?
   projectId      String?
   secretId       String?
+  tokenId        String?
   
   // Event details
   eventType      String    // 'user_login', 'secret_access', 'secret_create', etc.
   action         String    // 'view', 'create', 'update', 'delete', 'success', 'failed'
   resourceName   String?   // 'Secret: API_KEY', 'Project: My App', 'User: john@example.com'
+  resourceType   String?   // 'secret', 'token', 'project', 'user', 'folder'
+  
+  // Context for filtering by folder/environment
+  environment    String?
+  folder         String?
+  
+  // Metadata for structured data (changes, diffs, etc.)
+  metadata       Json?     // { changedFields: [...], from: {...}, to: {...}, scopes: [...], etc. }
   
   // Context
   description    String?
@@ -321,6 +330,9 @@ model AuditLog {
   @@index([projectId])
   @@index([eventType])
   @@index([createdAt])
+  @@index([environment])
+  @@index([folder])
+  @@index([resourceType])
 }
 
 /// API key for project-level secret access via public API

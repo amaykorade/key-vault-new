@@ -183,6 +183,12 @@ export function ProjectDetailsPage() {
   const [showRenameEnv, setShowRenameEnv] = useState(false);
   const [envToRename, setEnvToRename] = useState<string | null>(null);
   const [renameLabel, setRenameLabel] = useState('');
+  
+  // Rename project state
+  const [showRenameProject, setShowRenameProject] = useState(false);
+  const [renameProjectName, setRenameProjectName] = useState('');
+  const [renameProjectDesc, setRenameProjectDesc] = useState('');
+  const [isRenamingProject, setIsRenamingProject] = useState(false);
   const requestDeleteEnvironment = (env: string) => {
     setEnvToDelete(env);
     setConfirmSlug('');
@@ -213,6 +219,33 @@ export function ProjectDetailsPage() {
     setShowRenameEnv(false);
     setEnvToRename(null);
     setRenameLabel('');
+  };
+
+  const handleOpenRenameProject = () => {
+    if (!project) return;
+    setRenameProjectName(project.name);
+    setRenameProjectDesc(project.description || '');
+    setShowRenameProject(true);
+    setEnvMenuOpen(false);
+  };
+
+  const handleConfirmRenameProject = async () => {
+    if (!id || !renameProjectName.trim()) return;
+    try {
+      setIsRenamingProject(true);
+      await apiService.updateProject(id, {
+        name: renameProjectName.trim(),
+        description: renameProjectDesc.trim() || undefined,
+      });
+      await fetchProject();
+      toast.success('Project renamed successfully');
+      setShowRenameProject(false);
+    } catch (err) {
+      toast.error('Failed to rename project');
+      console.error('Failed to rename project:', err);
+    } finally {
+      setIsRenamingProject(false);
+    }
   };
 
   const handleAddSecret = (environment: string, folder?: string) => {
@@ -364,16 +397,6 @@ export function ProjectDetailsPage() {
           </div>
         </div>
         <div className="flex items-center space-x-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate(-1)}
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back
-            </Button>
           <div className="relative">
             <button
               className="p-2 rounded-md border border-gray-700 text-gray-300 hover:bg-gray-800"
@@ -388,6 +411,12 @@ export function ProjectDetailsPage() {
             </button>
             {envMenuOpen && (
               <div className="absolute right-0 mt-2 w-44 bg-gray-900 border border-gray-700 rounded-md shadow-lg z-50">
+                <button
+                  className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-gray-800"
+                  onClick={handleOpenRenameProject}
+                >
+                  Rename project
+                </button>
                 <button
                   className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-gray-800"
                   onClick={() => { setShowAddEnv(true); setEnvMenuOpen(false); }}
@@ -568,6 +597,58 @@ export function ProjectDetailsPage() {
             <div className="px-4 py-3 border-t border-gray-800 flex items-center justify-end gap-2">
               <Button variant="outline" size="sm" onClick={() => setShowDeleteEnv(false)}>Cancel</Button>
               <Button size="sm" onClick={handleConfirmDeleteEnvironment} disabled={confirmSlug !== envToDelete}>Delete</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rename Project Modal */}
+      {showRenameProject && (
+        <div 
+          className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in"
+          onClick={() => setShowRenameProject(false)}
+        >
+          <div 
+            className="w-full max-w-md bg-gray-900 border border-gray-800 rounded-lg shadow-xl animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-gray-800">
+              <h3 className="text-white font-semibold text-lg">Rename Project</h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">Project name</label>
+                <input
+                  className="w-full h-10 rounded-md bg-gray-800 border border-gray-700 px-3 text-sm text-white outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:ring-0 focus:shadow-none focus-visible:shadow-none focus:border-gray-700 focus-visible:border-gray-700 appearance-none"
+                  value={renameProjectName}
+                  onChange={(e) => setRenameProjectName(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">Description (optional)</label>
+                <textarea
+                  className="w-full rounded-md bg-gray-800 border border-gray-700 px-3 py-2 text-sm text-white outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:ring-0 focus:shadow-none focus-visible:shadow-none focus:border-gray-700 focus-visible:border-gray-700 appearance-none resize-none"
+                  rows={3}
+                  value={renameProjectDesc}
+                  onChange={(e) => setRenameProjectDesc(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-800 flex items-center justify-end gap-2">
+              <button
+                className="px-4 py-2 text-sm rounded-md border border-gray-700 text-gray-300 hover:bg-gray-800"
+                onClick={() => setShowRenameProject(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 text-sm rounded-md bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50"
+                disabled={!renameProjectName.trim() || isRenamingProject}
+                onClick={handleConfirmRenameProject}
+              >
+                {isRenamingProject ? 'Saving...' : 'Save'}
+              </button>
             </div>
           </div>
         </div>

@@ -190,7 +190,7 @@ export function OrganizationsPage() {
           {organizations.map((org) => (
             <Card
               key={org.id}
-              className="hover-lift group cursor-pointer transition-all duration-200 border border-gray-800/80"
+              className="group cursor-pointer transition-colors duration-200 border border-gray-800 bg-gray-900/50 hover:bg-gray-800/30"
               onClick={() => navigate(`/organizations/${org.id}`)}
             >
               <CardContent className="p-5">
@@ -209,7 +209,7 @@ export function OrganizationsPage() {
                       <div className="text-[11px] text-gray-500">Created {new Date(org.createdAt).toLocaleDateString()}</div>
                     </div>
                   </div>
-                  <span className="text-[11px] px-2 py-1 rounded-md bg-gray-800 text-gray-300 border border-gray-700">
+                  <span className="text-[11px] px-2 py-1 rounded-md bg-gray-800/60 text-gray-300 border border-gray-700">
                     {org.memberCount} member{org.memberCount !== 1 ? 's' : ''}
                   </span>
                 </div>
@@ -220,9 +220,9 @@ export function OrganizationsPage() {
                 {/* Footer */}
                 <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-800 border border-gray-700">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-800/60 border border-gray-700">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                       </svg>
                       Workspace
                     </span>

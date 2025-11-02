@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { SecretService, SecretSchema } from '../services/secret';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { auditSecretCreate, auditSecretUpdate, auditSecretDelete, auditSecretAccess } from '../middleware/audit';
+import { AuditService } from '../services/audit';
 
 const router = Router();
 
@@ -9,8 +10,35 @@ const router = Router();
 router.post('/projects/:projectId/secrets', requireAuth, async (req: AuthRequest, res) => {
   try {
     const { projectId } = req.params;
+    console.log('Create secret request body:', JSON.stringify(req.body, null, 2));
+    console.log('Project ID:', projectId);
+    console.log('User:', req.user);
+    
     const data = SecretSchema.create.parse(req.body);
+    console.log('Parsed data:', data);
+    
     const secret = await SecretService.createSecret(projectId, req.user!.id, data);
+    
+    // Log the secret creation
+    const ipAddress = req.ip || req.connection?.remoteAddress;
+    
+    // Fetch project to get organizationId
+    const project = await require('../lib/db').db.project.findUnique({
+      where: { id: secret.projectId },
+      select: { organizationId: true }
+    });
+    
+    await AuditService.logSecretCreate(
+      req.user!.id,
+      secret.id,
+      secret.name,
+      secret.projectId,
+      project?.organizationId,
+      (secret as any).environment,
+      (secret as any).folder,
+      secret.type,
+      ipAddress
+    ).catch(console.error);
     
     res.status(201).json({
       secret: {
@@ -28,8 +56,11 @@ router.post('/projects/:projectId/secrets', requireAuth, async (req: AuthRequest
     });
   } catch (error) {
     console.error('Create secret error:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'N/A');
+    
     if (error instanceof Error && error.name === 'ZodError') {
       const zodError = error as any;
+      console.error('Zod validation errors:', zodError.errors);
       return res.status(400).json({ 
         error: 'Validation failed',
         details: zodError.errors.map((err: any) => ({
@@ -90,6 +121,29 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res) => {
       return res.status(404).json({ error: 'Secret not found' });
     }
 
+    // Log secret access if value is being viewed
+    if (includeValue) {
+      const ipAddress = req.ip || req.connection?.remoteAddress;
+      
+      // Fetch project to get organizationId
+      const project = await require('../lib/db').db.project.findUnique({
+        where: { id: secret.projectId },
+        select: { organizationId: true }
+      });
+      
+      await AuditService.logSecretAccess(
+        req.user!.id,
+        secret.id,
+        secret.name,
+        secret.projectId,
+        project?.organizationId,
+        (secret as any).environment,
+        (secret as any).folder,
+        'view',
+        ipAddress
+      ).catch(console.error);
+    }
+
     res.json({
       secret: {
         id: secret.id,
@@ -113,10 +167,32 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res) => {
 });
 
 // Update secret
-router.put('/:id', requireAuth, auditSecretUpdate, async (req: AuthRequest, res) => {
+router.put('/:id', requireAuth, async (req: AuthRequest, res) => {
   try {
     const data = SecretSchema.update.parse(req.body);
     const secret = await SecretService.updateSecret(req.params.id, req.user!.id, data);
+    
+    // Log the update
+    const ipAddress = req.ip || req.connection?.remoteAddress;
+    const changedFields = Object.keys(data);
+    
+    // Fetch project to get organizationId
+    const project = await require('../lib/db').db.project.findUnique({
+      where: { id: secret.projectId },
+      select: { organizationId: true }
+    });
+    
+    await AuditService.logSecretUpdate(
+      req.user!.id,
+      secret.id,
+      secret.name,
+      secret.projectId,
+      project?.organizationId,
+      (secret as any).environment,
+      (secret as any).folder,
+      changedFields,
+      ipAddress
+    ).catch(console.error);
     
     res.json({
       secret: {
@@ -152,8 +228,34 @@ router.put('/:id', requireAuth, auditSecretUpdate, async (req: AuthRequest, res)
 });
 
 // Delete secret
-router.delete('/:id', requireAuth, auditSecretDelete, async (req: AuthRequest, res) => {
+router.delete('/:id', requireAuth, async (req: AuthRequest, res) => {
   try {
+    // Fetch secret before deletion to log it
+    const secretToDelete = await SecretService.getSecretById(req.params.id, req.user!.id, false);
+    
+    // Log the deletion BEFORE actually deleting (so foreign key is still valid)
+    if (secretToDelete) {
+      const ipAddress = req.ip || req.connection?.remoteAddress;
+      
+      // Fetch project to get organizationId
+      const project = await require('../lib/db').db.project.findUnique({
+        where: { id: secretToDelete.projectId },
+        select: { organizationId: true }
+      });
+      
+      await AuditService.logSecretDelete(
+        req.user!.id,
+        secretToDelete.id,
+        secretToDelete.name,
+        secretToDelete.projectId,
+        project?.organizationId,
+        (secretToDelete as any).environment,
+        (secretToDelete as any).folder,
+        ipAddress
+      ).catch(console.error);
+    }
+    
+    // Now delete the secret
     await SecretService.deleteSecret(req.params.id, req.user!.id);
     
     res.status(204).send();

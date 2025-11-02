@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireApiToken, requireUserApiToken, ApiRequest } from '../middleware/token-auth';
 import { db } from '../lib/db';
 import { AccessControlService } from '../services/access-control';
+import { decryptSecret } from '../lib/encryption';
 
 const router = Router();
 
@@ -77,11 +78,14 @@ async function handler(req: ApiRequest, res: any) {
     });
     if (!secret) return res.status(404).json({ error: 'Secret not found' });
 
+    // Decrypt the secret value
+    const decryptedValue = decryptSecret(secret.value);
+
     // Return JSON format if explicitly requested, otherwise return plain value
     if (req.query.format === 'json') {
       return res.json({
         name: secret.name,
-        value: secret.value,
+        value: decryptedValue,
         environment: secret.environment,
         folder: secret.folder,
         type: secret.type,
@@ -90,9 +94,89 @@ async function handler(req: ApiRequest, res: any) {
     }
 
     // Default: return just the plain value for direct use
-    return res.type('text/plain').send(secret.value);
+    return res.type('text/plain').send(decryptedValue);
   } catch (err) {
     console.error('Public get secret error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+// Ultra-simple endpoint - only token + secret name needed
+// GET /api/v1/secrets/:name
+// Token determines project, environment, and folder automatically
+router.get('/simple/:name', async (req: ApiRequest, res, next) => {
+  const hasBearer = !!((req.header('authorization') || req.header('Authorization')) || '').toLowerCase().startsWith('bearer ');
+  if (hasBearer) return (requireUserApiToken as any)(req, res, () => simpleHandler(req, res));
+  return res.status(401).json({ error: 'Missing Bearer token' });
+});
+
+async function simpleHandler(req: ApiRequest, res: any) {
+  try {
+    const { name } = req.params as { name: string };
+    const pat: any = (req as any).pat;
+    
+    if (!pat) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Get project, environment, and folder from token scope
+    if (!pat.projects || pat.projects.length === 0) {
+      return res.status(400).json({ error: 'Token must be scoped to at least one project' });
+    }
+    
+    const projectId = pat.projects[0]; // Use first project
+    const env = pat.environments?.[0] || 'development'; // Use first environment or default
+    const folder = pat.folders?.[0] || 'default'; // Use first folder or default
+
+    // Check IP allowlist
+    if (pat.ipAllowlist?.length) {
+      const ip = (req.ip || req.socket.remoteAddress || '').replace('::ffff:', '');
+      if (!pat.ipAllowlist.includes(ip)) {
+        return res.status(403).json({ error: 'IP not allowed' });
+      }
+    }
+
+    // Check RBAC
+    const canRead = await AccessControlService.canRead(pat.userId, projectId);
+    if (!canRead) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+
+    // Update last used
+    db.userApiToken.update({ where: { id: pat.id }, data: { lastUsedAt: new Date() } }).catch(() => {});
+
+    // Fetch the secret
+    const secret = await db.secret.findFirst({
+      where: { projectId, name, environment: env, folder },
+      select: { id: true, name: true, value: true, type: true, environment: true, folder: true, updatedAt: true },
+    });
+    
+    if (!secret) {
+      return res.status(404).json({ 
+        error: 'Secret not found',
+        hint: `Looking for secret "${name}" in project ${projectId}, environment "${env}", folder "${folder}"`
+      });
+    }
+
+    // Decrypt the secret value
+    const decryptedValue = decryptSecret(secret.value);
+
+    // Return JSON format if explicitly requested, otherwise return plain value
+    if (req.query.format === 'json') {
+      return res.json({
+        name: secret.name,
+        value: decryptedValue,
+        environment: secret.environment,
+        folder: secret.folder,
+        type: secret.type,
+        updatedAt: secret.updatedAt,
+      });
+    }
+
+    // Default: return just the plain value for direct use
+    return res.type('text/plain').send(decryptedValue);
+  } catch (err) {
+    console.error('Simple get secret error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -150,7 +234,7 @@ async function shortHandler(req: ApiRequest, res: any) {
         const ip = (req.ip || req.socket.remoteAddress || '').replace('::ffff:', '');
         if (!pat.ipAllowlist.includes(ip)) return res.status(403).json({ error: 'IP not allowed' });
       }
-      const canRead = await AccessControlService.canRead(pat.userId, projectId);
+      const canRead = await AccessControlService.canRead(pat.userId, projectId!);
       if (!canRead) return res.status(403).json({ error: 'Insufficient permissions' });
       db.userApiToken.update({ where: { id: pat.id }, data: { lastUsedAt: new Date() } }).catch(() => {});
     }
@@ -163,11 +247,14 @@ async function shortHandler(req: ApiRequest, res: any) {
     });
     if (!secret) return res.status(404).json({ error: 'Secret not found' });
 
+    // Decrypt the secret value
+    const decryptedValue = decryptSecret(secret.value);
+
     // Return JSON format if explicitly requested, otherwise return plain value
     if (req.query.format === 'json') {
       return res.json({
         name: secret.name,
-        value: secret.value,
+        value: decryptedValue,
         environment: secret.environment,
         folder: secret.folder,
         type: secret.type,
@@ -176,7 +263,7 @@ async function shortHandler(req: ApiRequest, res: any) {
     }
 
     // Default: return just the plain value for direct use
-    return res.type('text/plain').send(secret.value);
+    return res.type('text/plain').send(decryptedValue);
   } catch (err) {
     console.error('Short get secret error:', err);
     res.status(500).json({ error: 'Internal server error' });

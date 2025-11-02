@@ -4,10 +4,10 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { PublicRoute } from './components/PublicRoute';
 import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
-import { DashboardPage } from './pages/DashboardPage';
 import { OrganizationsPage } from './pages/OrganizationsPage';
 import { OrganizationDetailsPage } from './pages/OrganizationDetailsPage';
 import { ProjectDetailsPage } from './pages/ProjectDetailsPage';
+import { ProjectsPage } from './pages/ProjectsPage';
 import { TeamDetailsPage } from './pages/TeamDetailsPage';
 import { TeamsPage } from './pages/TeamsPage';
 import { InvitationAcceptPage } from './pages/InvitationAcceptPage';
@@ -44,17 +44,6 @@ function App() {
 
           {/* Protected routes */}
           <Route
-            path={ROUTES.DASHBOARD}
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <DashboardPage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
             path={ROUTES.ORGANIZATIONS}
             element={
               <ProtectedRoute>
@@ -71,6 +60,17 @@ function App() {
               <ProtectedRoute>
                 <AppLayout>
                   <OrganizationDetailsPage />
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path={ROUTES.PROJECTS}
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <ProjectsPage />
                 </AppLayout>
               </ProtectedRoute>
             }
