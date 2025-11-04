@@ -434,26 +434,6 @@ export function FolderPage() {
             Secrets
           </button>
           <button
-            onClick={() => setActiveTab('access')}
-            className={`pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'access'
-                ? 'border-emerald-500 text-emerald-400'
-                : 'border-transparent text-gray-400 hover:text-gray-300'
-            }`}
-          >
-            Access
-          </button>
-          <button
-            onClick={() => setActiveTab('logs')}
-            className={`pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'logs'
-                ? 'border-emerald-500 text-emerald-400'
-                : 'border-transparent text-gray-400 hover:text-gray-300'
-            }`}
-          >
-            Logs
-          </button>
-          <button
             onClick={() => setActiveTab('integrations')}
             className={`pb-3 px-1 border-b-2 font-medium text-sm transition-colors relative group ${
               activeTab === 'integrations'
@@ -462,7 +442,7 @@ export function FolderPage() {
             }`}
           >
             <span className="flex items-center gap-2">
-              Integrations
+              Connected Syncs
               {vercelConnected && hasUnsyncedChanges && (
                 <>
                   <svg 
@@ -486,6 +466,26 @@ export function FolderPage() {
                 </>
               )}
             </span>
+          </button>
+          <button
+            onClick={() => setActiveTab('access')}
+            className={`pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === 'access'
+                ? 'border-emerald-500 text-emerald-400'
+                : 'border-transparent text-gray-400 hover:text-gray-300'
+            }`}
+          >
+            Access
+          </button>
+          <button
+            onClick={() => setActiveTab('logs')}
+            className={`pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === 'logs'
+                ? 'border-emerald-500 text-emerald-400'
+                : 'border-transparent text-gray-400 hover:text-gray-300'
+            }`}
+          >
+            Logs
           </button>
         </div>
       </div>
@@ -1124,222 +1124,227 @@ export function FolderPage() {
         </Card>
       )}
 
-      {/* Integrations Tab */}
+      {/* Config Syncs Tab */}
       {activeTab === 'integrations' && (
         <Card className="hover-lift">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-white text-sm font-semibold">Vercel Integration</CardTitle>
+          <CardHeader className="pb-3 flex flex-row items-center justify-between">
+            <CardTitle className="text-white text-sm font-semibold">Config Syncs</CardTitle>
+            <button
+              onClick={() => setShowConnectModal(true)}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded-lg transition-colors flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Sync
+            </button>
           </CardHeader>
           <CardContent className="space-y-6">
-            {!vercelConnected ? (
-              /* Not Connected State */
-              <div className="text-center py-10">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-blue-400" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2L2 22h20L12 2z" />
+            {/* Unsynced Changes Warning */}
+            {vercelConnected && hasUnsyncedChanges && (
+              <div className="flex items-start gap-3 p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg animate-pulse">
+                <svg className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div className="flex-1">
+                  <h4 className="text-sm font-semibold text-orange-400 mb-1">Unsynced Changes</h4>
+                  <p className="text-xs text-gray-300">
+                    You have made changes to your secrets. Trigger a sync below to push the latest changes.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Syncs Table */}
+            {vercelConnected ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Integration</TableHead>
+                    <TableHead>Destination</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {/* Vercel Sync Row */}
+                  <TableRow className="group">
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 2L2 22h20L12 2z" />
+                        </svg>
+                        <span className="text-sm font-medium text-white">Vercel</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm text-gray-300">
+                        {(() => {
+                          const projectToShow = selectedVercelProject || vercelProjects[0]?.id;
+                          const project = vercelProjects.find(p => p.id === projectToShow);
+                          return project ? (
+                            <span className="font-medium text-white">{project.name}</span>
+                          ) : (
+                            <span className="text-gray-500">Not configured</span>
+                          );
+                        })()}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        {(() => {
+                          const projectToShow = selectedVercelProject || vercelProjects[0]?.id;
+                          const project = vercelProjects.find(p => p.id === projectToShow);
+                          return project ? (
+                            <div className="flex items-center gap-2 text-gray-300">
+                              <span className="font-medium text-white">{project.name}</span>
+                              <span className="text-gray-500">/</span>
+                              <span className="capitalize text-gray-300">{vercelEnvTarget}</span>
+                              <span className="text-gray-500">/</span>
+                              <span className="text-gray-400">Encrypted</span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-500">Not configured</span>
+                          );
+                        })()}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {hasUnsyncedChanges ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-medium rounded-full">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                          Out of sync
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium rounded-full">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Synced
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => {
+                            // Open edit/configure modal
+                            setShowConnectModal(true);
+                          }}
+                          className="px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-800 rounded transition-colors"
+                          title="Configure sync"
+                        >
+                          Configure
+                        </button>
+                        <button
+                          onClick={async () => {
+                            // Use first project if none selected
+                            const projectToSync = selectedVercelProject || vercelProjects[0]?.id;
+                            
+                            if (!id || !projectToSync) {
+                              alert('Please configure the sync first by clicking "Configure"');
+                              return;
+                            }
+                            
+                            try {
+                              setIsSyncing(true);
+                              
+                              const selectedProject = vercelProjects.find(p => p.id === projectToSync);
+                              
+                              const res = await fetch(`/api/vercel/sync`, {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+                                },
+                                body: JSON.stringify({
+                                  projectId: id,
+                                  environment: env,
+                                  folder: folder || 'default',
+                                  vercelProjectId: projectToSync,
+                                  vercelProjectName: selectedProject?.name,
+                                  vercelEnvTarget,
+                                }),
+                              });
+                              
+                              if (!res.ok) {
+                                const errorData = await res.json();
+                                alert(`Sync failed: ${errorData.error || 'Unknown error'}`);
+                                return;
+                              }
+                              
+                              const data = await res.json();
+                              
+                              if (data.success) {
+                                if (data.errors && data.errors.length > 0) {
+                                  alert(`Synced ${data.synced} secret(s) with ${data.errors.length} error(s):\n${data.errors.join('\n')}`);
+                                } else {
+                                  setSyncResult({
+                                    synced: data.synced,
+                                    projectName: selectedProject?.name || 'Unknown Project',
+                                    envTarget: vercelEnvTarget,
+                                  });
+                                  setShowSyncSuccessModal(true);
+                                  setTimeout(() => checkSyncStatus(), 100);
+                                }
+                                await checkVercelConnection();
+                              } else {
+                                alert(`Sync failed: ${data.error || 'Unknown error'}`);
+                              }
+                            } catch (e) {
+                              console.error('Sync failed:', e);
+                              alert('Failed to sync to Vercel. Please try again.');
+                            } finally {
+                              setIsSyncing(false);
+                            }
+                          }}
+                          disabled={vercelProjects.length === 0 || isSyncing}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isSyncing ? (
+                            <span className="flex items-center gap-1.5">
+                              <svg className="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                              Syncing...
+                            </span>
+                          ) : (
+                            'Trigger Sync'
+                          )}
+                        </button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            ) : (
+              /* Empty State */
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-semibold text-white mb-2">Connect to Vercel</h3>
+                <h3 className="text-lg font-semibold text-white mb-2">No Config Syncs</h3>
                 <p className="text-sm text-gray-400 mb-6 max-w-md mx-auto">
-                  Sync your secrets directly to Vercel environment variables. No more manual copying!
+                  Connect your secrets to external platforms like Vercel to automatically sync environment variables.
                 </p>
                 <button
                   onClick={() => setShowConnectModal(true)}
-                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-lg transition-all shadow-lg hover:shadow-xl"
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
                 >
-                  Connect Vercel
+                  Add Your First Sync
                 </button>
               </div>
-            ) : (
-              /* Connected State */
-              <div className="space-y-6">
-                {/* Unsynced Changes Warning */}
-                {hasUnsyncedChanges && (
-                  <div className="flex items-start gap-3 p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg animate-pulse">
-                    <svg className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <div className="flex-1">
-                      <h4 className="text-sm font-semibold text-orange-400 mb-1">Unsynced Changes</h4>
-                      <p className="text-xs text-gray-300">
-                        You have made changes to your secrets. Click "Sync to Vercel" below to push the latest changes.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Connection Status */}
-                <div className="flex items-center justify-between p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center">
-                      <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-semibold text-white">Vercel Connected</h4>
-                      <p className="text-xs text-gray-400">Ready to sync secrets</p>
-                    </div>
-                  </div>
-                  <button
-                    className="px-3 py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors"
-                  >
-                    Disconnect
-                  </button>
-                </div>
-
-                {/* Sync Configuration */}
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-gray-300 mb-2 block">Vercel Project</label>
-                    <Select value={selectedVercelProject} onValueChange={setSelectedVercelProject}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a Vercel project..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {vercelProjects.length === 0 ? (
-                          <div className="px-4 py-3 text-sm text-gray-500">No projects found</div>
-                        ) : (
-                          vercelProjects.map((proj) => (
-                            <SelectItem key={proj.id} value={proj.id}>
-                              {proj.name}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium text-gray-300 mb-2 block">Target Environment</label>
-                    <Select value={vercelEnvTarget} onValueChange={(val) => setVercelEnvTarget(val as any)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="development">Development</SelectItem>
-                        <SelectItem value="preview">Preview</SelectItem>
-                        <SelectItem value="production">Production</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <button
-                    onClick={async () => {
-                      if (!id || !selectedVercelProject) {
-                        alert('Please select a Vercel project first');
-                        return;
-                      }
-                      
-                      try {
-                        setIsSyncing(true);
-                        
-                        // Get the selected project name for logging
-                        const selectedProject = vercelProjects.find(p => p.id === selectedVercelProject);
-                        
-                        console.log('Starting sync to Vercel...');
-                        console.log('Project:', id);
-                        console.log('Vercel Project:', selectedProject?.name);
-                        console.log('Environment:', env, '→ Vercel:', vercelEnvTarget);
-                        console.log('Folder:', folder || 'default');
-                        
-                        // Call sync API
-                        const res = await fetch(`/api/vercel/sync`, {
-                          method: 'POST',
-                          headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-                          },
-                          body: JSON.stringify({
-                            projectId: id,
-                            environment: env,
-                            folder: folder || 'default',
-                            vercelProjectId: selectedVercelProject,
-                            vercelProjectName: selectedProject?.name,
-                            vercelEnvTarget,
-                          }),
-                        });
-                        
-                        console.log('Sync response status:', res.status);
-                        
-                        if (!res.ok) {
-                          const errorData = await res.json();
-                          console.error('Sync error:', errorData);
-                          alert(`Sync failed: ${errorData.error || 'Unknown error'}`);
-                          return;
-                        }
-                        
-                        const data = await res.json();
-                        console.log('Sync result:', data);
-                        
-                        if (data.success) {
-                          if (data.errors && data.errors.length > 0) {
-                            alert(`Synced ${data.synced} secret(s) with ${data.errors.length} error(s):\n${data.errors.join('\n')}`);
-                          } else {
-                            // Show success modal with redeploy prompt
-                            setSyncResult({
-                              synced: data.synced,
-                              projectName: selectedProject?.name || 'Unknown Project',
-                              envTarget: vercelEnvTarget,
-                            });
-                            setShowSyncSuccessModal(true);
-                            
-                            // Check sync status after successful sync (small delay to ensure DB commit)
-                            setTimeout(() => checkSyncStatus(), 100);
-                          }
-                          
-                          // Refresh sync status
-                          await checkVercelConnection();
-                        } else {
-                          alert(`Sync failed: ${data.error || 'Unknown error'}`);
-                        }
-                      } catch (e) {
-                        console.error('Sync failed:', e);
-                        alert('Failed to sync to Vercel. Please try again.');
-                      } finally {
-                        setIsSyncing(false);
-                      }
-                    }}
-                    disabled={!selectedVercelProject || isSyncing}
-                    className="w-full px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                  >
-                    {isSyncing ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        Syncing to Vercel...
-                      </span>
-                    ) : (
-                      'Sync to Vercel'
-                    )}
-                  </button>
-                </div>
-
-                {/* Info Box */}
-                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <svg className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <div className="text-sm text-gray-300">
-                      <p className="font-medium text-blue-400 mb-1">How it works:</p>
-                      <ul className="space-y-1 text-xs text-gray-400">
-                        <li>• All secrets from <strong className="text-gray-300">{env}/{folder || 'default'}</strong> will be synced</li>
-                        <li>• Secrets are created as encrypted environment variables in Vercel</li>
-                        <li>• Existing variables with the same name will be updated</li>
-                        <li>• You can re-sync anytime to update changed secrets</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-            </div>
             )}
           </CardContent>
         </Card>
       )}
 
-      {/* Sync Success Modal with Redeploy Prompt */}
+      {/* Sync Success Modal with Auto Deployment */}
       {showSyncSuccessModal && syncResult && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="w-full max-w-md bg-gray-900 rounded-xl border border-gray-700 shadow-2xl animate-slide-up">
@@ -1352,7 +1357,7 @@ export function FolderPage() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Sync Successful!</h3>
+                  <h3 className="text-lg font-semibold text-white">Secrets Synced!</h3>
                   <p className="text-sm text-gray-400">
                     {syncResult.synced} secret{syncResult.synced !== 1 ? 's' : ''} synced to Vercel
                   </p>
@@ -1362,7 +1367,7 @@ export function FolderPage() {
               {/* Sync Details */}
               <div className="bg-gray-800/50 rounded-lg p-3 mb-4 space-y-1 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-400">Vercel Project:</span>
+                  <span className="text-gray-400">Project:</span>
                   <span className="text-gray-200 font-medium">{syncResult.projectName}</span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -1371,67 +1376,50 @@ export function FolderPage() {
                 </div>
               </div>
 
-              {/* Warning about redeployment */}
-              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-4">
+              {/* Next Steps */}
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-4">
                 <div className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  <svg className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <div>
-                    <h4 className="text-sm font-semibold text-yellow-400 mb-1">Redeployment Required</h4>
-                    <p className="text-xs text-gray-300 leading-relaxed">
-                      To use the updated secrets, you need to redeploy your Vercel project. 
-                      Existing deployments will continue using the old values.
+                    <h4 className="text-sm font-semibold text-blue-400 mb-1">Next: Redeploy in Vercel</h4>
+                    <p className="text-xs text-gray-300 leading-relaxed mb-2">
+                      Secrets are synced! To use the new values, trigger a redeployment:
                     </p>
+                    <ul className="text-xs text-gray-400 space-y-1">
+                      <li>• Push to your Git repository (auto-deploys)</li>
+                      <li>• Or click "Redeploy" in Vercel dashboard</li>
+                    </ul>
                   </div>
                 </div>
               </div>
 
-              {/* Actions */}
+              {/* Action Buttons */}
               <div className="flex gap-3">
                 <button
                   onClick={() => {
                     setShowSyncSuccessModal(false);
                     setSyncResult(null);
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-700 text-gray-300 hover:bg-gray-800 rounded-lg transition-colors"
+                  className="flex-1 px-4 py-2.5 border border-gray-700 text-gray-300 hover:bg-gray-800 rounded-lg transition-colors font-medium"
                 >
-                  I'll Deploy Later
+                  Done
                 </button>
                 <button
-                  onClick={async () => {
-                    try {
-                      setIsTriggeringDeploy(true);
-                      
-                      // Open Vercel project deployments page in new tab
-                      const vercelProjectUrl = `https://vercel.com/dashboard/deployments`;
-                      window.open(vercelProjectUrl, '_blank');
-                      
-                      // Close modal after opening Vercel
-                      setTimeout(() => {
-                        setShowSyncSuccessModal(false);
-                        setSyncResult(null);
-                      }, 500);
-                    } catch (e) {
-                      console.error('Failed to open Vercel:', e);
-                    } finally {
-                      setIsTriggeringDeploy(false);
-                    }
+                  onClick={() => {
+                    window.open(`https://vercel.com/dashboard`, '_blank');
+                    setShowSyncSuccessModal(false);
+                    setSyncResult(null);
                   }}
-                  disabled={isTriggeringDeploy}
-                  className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                   </svg>
-                  Go to Vercel Deployments
+                  Open Vercel
                 </button>
               </div>
-
-              {/* Help Text */}
-              <p className="text-xs text-gray-500 text-center mt-3">
-                Tip: You can also trigger deployments via Git push or Vercel CLI
-              </p>
             </div>
           </div>
         </div>

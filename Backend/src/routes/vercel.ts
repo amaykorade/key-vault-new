@@ -279,5 +279,57 @@ router.get('/sync-status/:projectId/:environment/:folder', requireAuth, async (r
   }
 });
 
+/**
+ * POST /vercel/deploy
+ * Trigger a Vercel deployment
+ */
+router.post('/deploy', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const schema = z.object({
+      organizationId: z.string().uuid(),
+      vercelProjectId: z.string(),
+    });
+
+    const data = schema.parse(req.body);
+
+    const accessToken = await VercelService.getAccessToken(req.user!.id, data.organizationId);
+    if (!accessToken) {
+      return res.status(404).json({ error: 'Vercel not connected' });
+    }
+
+    // Get team ID from integration
+    const integration = await require('../lib/db').db.vercelIntegration.findUnique({
+      where: {
+        userId_organizationId: {
+          userId: req.user!.id,
+          organizationId: data.organizationId,
+        },
+      },
+    });
+
+    const result = await VercelService.triggerDeployment(
+      accessToken,
+      data.vercelProjectId,
+      integration?.vercelTeamId || undefined
+    );
+
+    if (result.success) {
+      res.json({
+        success: true,
+        deploymentUrl: result.deploymentUrl,
+        message: 'Deployment triggered successfully',
+      });
+    } else {
+      res.status(500).json({ error: result.error || 'Failed to trigger deployment' });
+    }
+  } catch (error: any) {
+    console.error('Failed to trigger deployment:', error);
+    if (error.name === 'ZodError') {
+      return res.status(400).json({ error: 'Invalid request data' });
+    }
+    res.status(500).json({ error: error.message || 'Failed to trigger deployment' });
+  }
+});
+
 export default router;
 

@@ -446,5 +446,54 @@ export class VercelService {
       return false; // Default to false on error
     }
   }
+
+  /**
+   * Trigger a deployment for a Vercel project
+   */
+  static async triggerDeployment(
+    accessToken: string,
+    projectId: string,
+    teamId?: string
+  ): Promise<{ success: boolean; deploymentUrl?: string; error?: string }> {
+    try {
+      const url = teamId
+        ? `${VERCEL_API_BASE}/v13/deployments?teamId=${teamId}`
+        : `${VERCEL_API_BASE}/v13/deployments`;
+
+      console.log('[Vercel] Triggering deployment for project:', projectId);
+
+      const response = await axios.post(
+        url,
+        {
+          name: projectId,
+          project: projectId,
+          target: 'production',
+          gitSource: {
+            type: 'github',
+            repoId: projectId,
+          },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      console.log('[Vercel] Deployment triggered:', response.data.url);
+
+      return {
+        success: true,
+        deploymentUrl: response.data.url,
+      };
+    } catch (error: any) {
+      console.error('[Vercel] Deployment trigger failed:', error.response?.data || error.message);
+      return {
+        success: false,
+        error: error.response?.data?.error?.message || error.message || 'Failed to trigger deployment',
+      };
+    }
+  }
 }
 
