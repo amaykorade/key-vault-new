@@ -432,6 +432,43 @@ export class AuditService {
   }
 
   /**
+   * Log Vercel sync events
+   */
+  static async logVercelSync(
+    userId: string,
+    projectId: string,
+    organizationId?: string,
+    environment?: string,
+    folder?: string,
+    vercelProjectName?: string,
+    syncedCount?: number,
+    status?: 'success' | 'failed',
+    errors?: string[],
+    ipAddress?: string
+  ): Promise<void> {
+    await this.log({
+      userId,
+      projectId,
+      organizationId: organizationId || undefined,
+      eventType: 'vercel_sync',
+      action: status === 'success' ? 'update' : 'failed',
+      resourceName: `Vercel: ${vercelProjectName || 'Unknown Project'}`,
+      resourceType: 'integration',
+      environment,
+      folder,
+      metadata: {
+        syncedCount,
+        errors,
+        vercelProjectName,
+      },
+      description: status === 'success'
+        ? `User synced ${syncedCount} secret(s) to Vercel project "${vercelProjectName}"`
+        : `Failed to sync secrets to Vercel: ${errors?.join(', ')}`,
+      ipAddress,
+    });
+  }
+
+  /**
    * Get recent activity for dashboard
    */
   static async getRecentActivity(organizationId?: string, limit: number = 20) {

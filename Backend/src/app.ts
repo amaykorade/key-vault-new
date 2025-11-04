@@ -14,6 +14,7 @@ import auditRoutes from './routes/audit';
 import publicSecretsRoutes from './routes/public-secrets';
 import apiKeysRoutes from './routes/api-keys';
 import tokensRoutes from './routes/tokens';
+import vercelRoutes from './routes/vercel';
 import { requireAuth, AuthRequest } from './middleware/auth';
 
 const app = express();
@@ -68,6 +69,10 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/v1', publicSecretsRoutes);
 app.use('/api', apiKeysRoutes);
 app.use('/api', tokensRoutes);
+
+// Vercel integration routes
+app.use('/api/vercel', vercelRoutes);
+app.use('/api/auth/vercel', vercelRoutes); // OAuth callback
 
 // Protected route example
 app.get('/api/me', requireAuth, (req: AuthRequest, res) => {

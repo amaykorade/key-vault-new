@@ -137,8 +137,8 @@ export function SecretRow({
               className={`flex items-center h-9 ${canEdit ? 'cursor-pointer' : ''}`}
               title={canEdit ? 'Click to edit name' : undefined}
             >
-              <span className="text-sm font-semibold text-white truncate">
-                {formatName(secret.name)}
+              <span className="text-sm font-semibold text-white truncate font-mono">
+                {secret.name}
               </span>
               {canEdit && (
                 <svg className="w-3.5 h-3.5 text-gray-500 ml-2 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
