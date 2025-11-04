@@ -93,10 +93,6 @@ router.get('/callback', async (req, res) => {
  */
 router.post('/connect', requireAuth, async (req: AuthRequest, res) => {
   try {
-    console.log('Vercel connect endpoint hit');
-    console.log('Request body:', req.body);
-    console.log('User:', req.user);
-    
     if (!req.user) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
@@ -109,7 +105,6 @@ router.post('/connect', requireAuth, async (req: AuthRequest, res) => {
     });
 
     const data = schema.parse(req.body);
-    console.log('Parsed data:', { ...data, accessToken: '***' });
 
     await VercelService.storeAccessToken(
       req.user.id,
@@ -118,8 +113,6 @@ router.post('/connect', requireAuth, async (req: AuthRequest, res) => {
       data.teamId,
       data.teamName
     );
-
-    console.log('Vercel token stored successfully');
 
     res.json({ success: true, message: 'Vercel connected successfully' });
   } catch (error: any) {
@@ -268,13 +261,11 @@ router.get('/sync-status/:projectId/:environment/:folder', requireAuth, async (r
   try {
     const { projectId, environment, folder } = req.params;
 
-    console.log('[Sync API] Checking sync status:', { projectId, environment, folder });
     const hasUnsyncedChanges = await VercelService.hasUnsyncedChanges(projectId, environment, folder);
-    console.log('[Sync API] Result:', hasUnsyncedChanges);
 
     res.json({ hasUnsyncedChanges });
   } catch (error) {
-    console.error('[Sync API] Failed to check sync status:', error);
+    console.error('Failed to check sync status:', error);
     res.status(500).json({ error: 'Failed to check sync status' });
   }
 });

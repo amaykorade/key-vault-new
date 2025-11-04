@@ -203,9 +203,9 @@ export function SecretRow({
         </TableCell>
 
         {/* Value */}
-        <TableCell className="min-w-0" title={canEdit ? 'Click to edit value' : undefined}>
+        <TableCell className="w-[45%]" title={canEdit ? 'Click to edit value' : undefined}>
           <div 
-            className="min-w-0"
+            className="w-full max-w-full overflow-hidden"
             onClick={() => { if (canEdit && !isEditingValue) { setEditedValue(secret.value === ' ' ? '' : secret.value); setIsEditingValue(true); } }}
           >
             {isEditingValue ? (
@@ -238,14 +238,14 @@ export function SecretRow({
                 style={{ letterSpacing: '0.03em' }}
               />
             ) : isRevealed ? (
-              <div className="font-mono text-sm text-gray-200 whitespace-nowrap overflow-hidden text-ellipsis leading-6 min-h-[24px]">
+              <div className="font-mono text-sm text-gray-200 truncate h-6 flex items-center">
                 {secret.value}
               </div>
             ) : (
-              <div className="font-mono text-sm text-gray-500 select-none whitespace-nowrap overflow-hidden text-ellipsis leading-6 min-h-[24px]">
+              <div className="font-mono text-sm text-gray-500 select-none h-6 flex items-center">
                 <span className="tracking-wider">••••••••••••••••••••••••••••••••</span>
                 {canEdit && (
-                  <span className="ml-2 text-xs text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity">Click to edit</span>
+                  <span className="ml-2 text-xs text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">Click to edit</span>
                 )}
               </div>
             )}

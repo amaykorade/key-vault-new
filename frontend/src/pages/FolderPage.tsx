@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table';
 import { Button } from '../components/ui/Button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/Select';
+import { Tabs, TabsList, TabsTrigger } from '../components/ui/Tabs';
 import { SecretRow } from '../components/SecretRow';
 import { SecretForm } from '../components/forms/SecretForm';
 import { SecretModal } from '../components/forms/SecretModal';
@@ -219,16 +220,33 @@ export function FolderPage() {
     
     // Filter by resource type
     if (logTypeFilter !== 'all') {
-      filtered = filtered.filter(log => log.resourceType === logTypeFilter);
+      if (logTypeFilter === 'vercel_sync') {
+        // Show both 'integration' and 'vercel_sync' resource types
+        filtered = filtered.filter(log => 
+          log.resourceType === 'integration' || 
+          log.resourceType === 'vercel_sync' ||
+          log.eventType === 'vercel_sync'
+        );
+      } else {
+        filtered = filtered.filter(log => log.resourceType === logTypeFilter);
+      }
     }
     
     return filtered;
   }, [logs, logDateFilter, logTypeFilter]);
 
   const headerTitle = useMemo(() => {
-    const f = (folder || 'default').replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim();
-    const e = (env || '').charAt(0).toUpperCase() + (env || '').slice(1).toLowerCase();
-    return `${f} • ${e}`;
+    // Format folder name properly
+    const folderName = folder || 'default';
+    const formattedFolder = folderName
+      .split(/[-_]/)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+    
+    // Format environment name
+    const formattedEnv = env ? env.charAt(0).toUpperCase() + env.slice(1).toLowerCase() : 'Unknown';
+    
+    return `${formattedFolder} / ${formattedEnv}`;
   }, [env, folder]);
 
   useEffect(() => {
@@ -256,17 +274,7 @@ export function FolderPage() {
 
   // Check sync status from backend
   async function checkSyncStatus() {
-    if (!id || !env) {
-      console.log('[Sync] Skipping check - missing id or env');
-      return;
-    }
-    
-    if (!vercelConnected) {
-      console.log('[Sync] Skipping check - Vercel not connected');
-      return;
-    }
-    
-    console.log('[Sync] Checking sync status for:', { id, env, folder: folder || 'default' });
+    if (!id || !env || !vercelConnected) return;
     
     try {
       const res = await fetch(`/api/vercel/sync-status/${id}/${env}/${folder || 'default'}`, {
@@ -275,25 +283,18 @@ export function FolderPage() {
         },
       });
       
-      console.log('[Sync] API response status:', res.status);
-      
       if (res.ok) {
         const data = await res.json();
-        console.log('[Sync] Backend sync status:', data.hasUnsyncedChanges);
         setHasUnsyncedChanges(data.hasUnsyncedChanges);
-      } else {
-        const errorText = await res.text();
-        console.error('[Sync] API error:', res.status, errorText);
       }
     } catch (error) {
-      console.error('[Sync] Failed to check sync status:', error);
+      console.error('Failed to check sync status:', error);
     }
   }
 
   // Check sync status when folder changes or Vercel connection status changes
   useEffect(() => {
     if (vercelConnected && id && env) {
-      console.log('[Sync] useEffect triggered - checking sync status');
       checkSyncStatus();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -318,7 +319,6 @@ export function FolderPage() {
         },
       });
       const data = await res.json();
-      console.log('[Sync] Vercel connection status:', data.connected);
       setVercelConnected(data.connected || false);
       
       // If connected, fetch projects
@@ -538,13 +538,14 @@ export function FolderPage() {
                   <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                   <span>Tip: Click the name or value to edit inline.</span>
                 </div>
-                <Table>
+                <div className="w-full">
+                <Table className="table-fixed w-full">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Secret</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="w-[25%]">Name</TableHead>
+                      <TableHead className="w-[15%]">Type</TableHead>
+                      <TableHead className="w-[45%]">Secret</TableHead>
+                      <TableHead className="w-[15%] text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -576,9 +577,7 @@ export function FolderPage() {
                               if (forceEditNameId === secret.id) setForceEditNameId(null);
                               
                               // Check sync status after updating secret (small delay to ensure DB commit)
-                              console.log('[Sync] Secret updated. Vercel connected:', vercelConnected);
                               if (vercelConnected) {
-                                console.log('[Sync] Checking sync status');
                                 setTimeout(() => checkSyncStatus(), 100);
                               }
                             }
@@ -596,6 +595,7 @@ export function FolderPage() {
                 ))}
                   </TableBody>
                 </Table>
+                </div>
               </div>
             )}
           </CardContent>
@@ -935,44 +935,31 @@ export function FolderPage() {
             </div>
             
             {/* Resource Type Filter Tabs */}
-            <div className="flex gap-2 border-b border-gray-700/50">
-              <button
-                onClick={() => setLogTypeFilter('all')}
-                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-                  logTypeFilter === 'all'
-                    ? 'border-emerald-500 text-emerald-400'
-                    : 'border-transparent text-gray-400 hover:text-gray-300'
-                }`}
-              >
-                All Events
-              </button>
-              <button
-                onClick={() => setLogTypeFilter('secret')}
-                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-                  logTypeFilter === 'secret'
-                    ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-gray-400 hover:text-gray-300'
-                }`}
-              >
-                <svg className="w-4 h-4 inline mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                </svg>
-                Secrets
-              </button>
-              <button
-                onClick={() => setLogTypeFilter('token')}
-                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-                  logTypeFilter === 'token'
-                    ? 'border-purple-500 text-purple-400'
-                    : 'border-transparent text-gray-400 hover:text-gray-300'
-                }`}
-              >
-                <svg className="w-4 h-4 inline mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                </svg>
-                Access Tokens
-              </button>
-            </div>
+            <Tabs value={logTypeFilter} onValueChange={setLogTypeFilter}>
+              <TabsList className="w-full justify-start h-auto p-1">
+                <TabsTrigger value="all">
+                  All Events
+                </TabsTrigger>
+                <TabsTrigger value="secret">
+                  <svg className="w-4 h-4 inline mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                  </svg>
+                  Secrets
+                </TabsTrigger>
+                <TabsTrigger value="token">
+                  <svg className="w-4 h-4 inline mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                  </svg>
+                  Access Tokens
+                </TabsTrigger>
+                <TabsTrigger value="vercel_sync">
+                  <svg className="w-4 h-4 inline mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Connected Syncs
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </CardHeader>
           <CardContent>
             {isLoadingLogs ? (
@@ -1124,22 +1111,40 @@ export function FolderPage() {
         </Card>
       )}
 
-      {/* Config Syncs Tab */}
+      {/* Connected Syncs Tab */}
       {activeTab === 'integrations' && (
         <Card className="hover-lift">
           <CardHeader className="pb-3 flex flex-row items-center justify-between">
-            <CardTitle className="text-white text-sm font-semibold">Config Syncs</CardTitle>
+            <CardTitle className="text-white text-sm font-semibold">Connected Syncs</CardTitle>
             <button
               onClick={() => setShowConnectModal(true)}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded-lg transition-colors flex items-center gap-2"
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded-lg transition-colors flex items-center gap-1.5"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
               Add Sync
             </button>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Manual Redeploy Warning (MVP Notice) */}
+            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div className="flex-1">
+                  <h4 className="text-sm font-semibold text-yellow-400 mb-1">⚠️ Manual Redeployment Required (For Now)</h4>
+                  <p className="text-xs text-gray-300 leading-relaxed mb-2">
+                    After syncing secrets to Vercel, you currently need to <strong className="text-white">manually redeploy from your Vercel dashboard</strong> for changes to take effect.
+                  </p>
+                  <p className="text-xs text-gray-400 bg-gray-800/50 rounded px-2 py-1.5 inline-block">
+                    🚀 <strong className="text-emerald-400">Coming Soon:</strong> Automatic redeployment after sync - no manual work needed!
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Unsynced Changes Warning */}
             {vercelConnected && hasUnsyncedChanges && (
               <div className="flex items-start gap-3 p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg animate-pulse">
@@ -1328,7 +1333,7 @@ export function FolderPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-semibold text-white mb-2">No Config Syncs</h3>
+                <h3 className="text-lg font-semibold text-white mb-2">No Connected Syncs</h3>
                 <p className="text-sm text-gray-400 mb-6 max-w-md mx-auto">
                   Connect your secrets to external platforms like Vercel to automatically sync environment variables.
                 </p>
@@ -1376,21 +1381,20 @@ export function FolderPage() {
                 </div>
               </div>
 
-              {/* Next Steps */}
+              {/* Important Note */}
               <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-4">
                 <div className="flex items-start gap-3">
                   <svg className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <div>
-                    <h4 className="text-sm font-semibold text-blue-400 mb-1">Next: Redeploy in Vercel</h4>
+                    <h4 className="text-sm font-semibold text-blue-400 mb-1">⚠️ Redeploy Required</h4>
                     <p className="text-xs text-gray-300 leading-relaxed mb-2">
-                      Secrets are synced! To use the new values, trigger a redeployment:
+                      Environment variables have been updated in Vercel. To apply these changes to your live site, you need to <strong className="text-white">redeploy from your Vercel dashboard</strong>.
                     </p>
-                    <ul className="text-xs text-gray-400 space-y-1">
-                      <li>• Push to your Git repository (auto-deploys)</li>
-                      <li>• Or click "Redeploy" in Vercel dashboard</li>
-                    </ul>
+                    <p className="text-xs text-gray-400">
+                      Go to your Vercel project → Deployments → Click "Redeploy" on the latest deployment
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1494,6 +1498,18 @@ export function FolderPage() {
                 </p>
               </div>
 
+              {/* Deployment Note */}
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-4">
+                <div className="flex items-start gap-2">
+                  <svg className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-xs text-gray-300">
+                    <strong className="text-yellow-400">Note:</strong> After syncing secrets, you'll need to manually redeploy from your Vercel dashboard for changes to take effect.
+                  </p>
+                </div>
+              </div>
+
               {/* Actions */}
               <div className="flex gap-3">
                 <button
@@ -1530,8 +1546,6 @@ export function FolderPage() {
                         return;
                       }
                       
-                      console.log('Connecting to Vercel with org:', orgId);
-                      
                       const res = await fetch('/api/vercel/connect', {
                         method: 'POST',
                         headers: {
@@ -1543,9 +1557,6 @@ export function FolderPage() {
                           organizationId: orgId,
                         }),
                       });
-
-                      console.log('Response status:', res.status);
-                      console.log('Response ok:', res.ok);
                       
                       if (!res.ok) {
                         const text = await res.text();
@@ -1560,7 +1571,6 @@ export function FolderPage() {
                       }
 
                       const data = await res.json();
-                      console.log('Connection response:', data);
                       
                       if (data.success) {
                         setVercelConnected(true);
@@ -1574,7 +1584,6 @@ export function FolderPage() {
                           },
                         });
                         const projectsData = await projectsRes.json();
-                        console.log('Fetched Vercel projects:', projectsData);
                         setVercelProjects(projectsData.projects || []);
                       } else {
                         alert(`Failed to connect: ${data.error || 'Unknown error'}`);

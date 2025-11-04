@@ -460,8 +460,6 @@ export class VercelService {
         ? `${VERCEL_API_BASE}/v13/deployments?teamId=${teamId}`
         : `${VERCEL_API_BASE}/v13/deployments`;
 
-      console.log('[Vercel] Triggering deployment for project:', projectId);
-
       const response = await axios.post(
         url,
         {
@@ -480,8 +478,6 @@ export class VercelService {
           },
         }
       );
-
-      console.log('[Vercel] Deployment triggered:', response.data.url);
 
       return {
         success: true,
