@@ -1,11 +1,11 @@
 import React from 'react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
-import type { AuditFilters } from '../types';
+import type { AuditFilters as AuditFiltersType } from '../types';
 
 interface AuditFiltersProps {
-  filters: AuditFilters;
-  onFiltersChange: (filters: AuditFilters) => void;
+  filters: AuditFiltersType;
+  onFiltersChange: (filters: AuditFiltersType) => void;
 }
 
 export const AuditFilters: React.FC<AuditFiltersProps> = ({

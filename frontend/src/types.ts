@@ -195,3 +195,46 @@ export interface ProjectSearchParams {
 export interface OrganizationSearchParams {
   search?: string;
 }
+
+// Audit Log types
+export interface AuditLog {
+  id: string;
+  userId: string;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  organizationId?: string;
+  projectId?: string;
+  eventType: string;
+  action: string;
+  description?: string;
+  resourceType: string;
+  resourceId?: string;
+  resourceName?: string;
+  organization?: {
+    id: string;
+    name: string;
+  };
+  project?: {
+    id: string;
+    name: string;
+  };
+  ipAddress?: string;
+  userAgent?: string;
+  metadata?: Record<string, any>;
+  createdAt: string;
+}
+
+export interface AuditFilters {
+  organizationId?: string;
+  projectId?: string;
+  userId?: string;
+  eventType?: string;
+  resourceType?: string;
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+  offset?: number;
+}

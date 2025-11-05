@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Input } from './ui/Input';
 import { TableCell, TableRow } from './ui/Table';
-import type { Secret } from '../types';
+import type { Secret, SecretType } from '../types';
 
 interface SecretRowProps {
   secret: Secret;
@@ -154,7 +154,7 @@ export function SecretRow({
           {isEditingType && canEdit ? (
             <select
               value={editedType}
-              onChange={(e) => setEditedType(e.target.value)}
+              onChange={(e) => setEditedType(e.target.value as SecretType)}
               onBlur={async () => {
                 if (editedType !== secret.type) {
                   try {

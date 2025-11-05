@@ -23,24 +23,57 @@ app.use(helmet());
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-const corsOrigin = process.env.CORS_ORIGIN || '*';
-app.use(cors({ origin: corsOrigin, credentials: true }));
+// CORS configuration - allow frontend origin
+const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
+const isProduction = process.env.NODE_ENV === 'production';
+
+app.use(cors({ 
+  origin: corsOrigin, 
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Session middleware for OAuth
 app.use(session({
   secret: process.env.JWT_ACCESS_SECRET || 'fallback-secret',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false } // Set to true in production with HTTPS
+  proxy: isProduction, // Trust proxy in production (Render)
+  cookie: { 
+    secure: isProduction, // Use secure cookies in production
+    httpOnly: true,
+    sameSite: isProduction ? 'none' : 'lax', // Required for cross-origin cookies
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
 }));
 
 // Initialize Passport
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Health check
-app.get('/health', (_req, res) => {
-	res.status(200).json({ status: 'ok' });
+// Health check with detailed information
+app.get('/health', async (_req, res) => {
+	try {
+		// Check database connection
+		const { prisma } = require('./lib/db');
+		await prisma.$queryRaw`SELECT 1`;
+		
+		res.status(200).json({ 
+			status: 'ok',
+			timestamp: new Date().toISOString(),
+			environment: process.env.NODE_ENV || 'development',
+			database: 'connected'
+		});
+	} catch (error) {
+		res.status(503).json({ 
+			status: 'error',
+			timestamp: new Date().toISOString(),
+			environment: process.env.NODE_ENV || 'development',
+			database: 'disconnected',
+			error: error instanceof Error ? error.message : 'Unknown error'
+		});
+	}
 });
 
 // Auth routes

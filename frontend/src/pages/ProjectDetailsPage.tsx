@@ -453,7 +453,7 @@ export function ProjectDetailsPage() {
                 <EnvironmentColumn
                   key={env}
                   id={env}
-                  environment={env}
+                  environment={env as any}
                   secrets={secretsByEnvironment[env] || []}
                   onAddSecret={handleAddSecret}
                   onFolderClick={handleFolderClick}

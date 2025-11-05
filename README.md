@@ -1,282 +1,395 @@
-   # Key Vault 🔐
+# 🔐 Key Vault - Modern Secrets Management Platform
 
-A modern, secure secret management application built with React, TypeScript, Node.js, and PostgreSQL.
+A comprehensive, enterprise-grade secrets management platform built with modern web technologies. Securely store, manage, and distribute secrets across your organization with fine-grained access control and comprehensive audit logging.
 
-## 🚀 Features
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue)
 
-- **Secure Authentication**: Email/password and Google OAuth integration
-- **Organization Management**: Create and manage organizations with team members
-- **Project Organization**: Organize secrets by projects within organizations
-- **Environment Support**: Manage secrets across development, staging, and production environments
-- **Modern UI**: Clean, responsive interface with dark theme
-- **Real-time Updates**: Live updates for secret changes
-- **Audit Logging**: Track who accessed or modified secrets
-- **API Access**: Programmatic access via API keys
+---
 
-## 🛠 Tech Stack
+## ✨ Features
 
-### Frontend
-- **React 18** with TypeScript
-- **Vite** for fast development and building
-- **Tailwind CSS** for styling
-- **React Hook Form** with Zod validation
-- **Zustand** for state management
-- **React Router** for navigation
+### 🔐 Core Security
+- **AES-256 Encryption** - All secrets encrypted at rest
+- **Fine-grained Access Control** - Folder-scoped personal access tokens
+- **Comprehensive Audit Logging** - Track every action with full context
+- **Reveal-on-demand** - Secrets are hidden by default, audit logged on reveal
 
-### Backend
-- **Node.js** with TypeScript
-- **Express.js** framework
-- **Prisma** ORM with PostgreSQL
-- **JWT** authentication
-- **Passport.js** for OAuth strategies
-- **bcrypt** for password hashing
+### 🏢 Multi-tenancy
+- **Organizations** - Isolated workspaces for different entities
+- **Projects** - Organize secrets by application or service
+- **Teams** - Collaborate with team members
+- **Role-based Permissions** - Admin, Write, Read access levels
 
-### Database
-- **PostgreSQL** for data storage
-- **Prisma Migrations** for database schema management
+### 📁 Secret Organization
+- **Environments** - Development, Staging, Production
+- **Folders** - Organize secrets into logical groups
+- **Inline Editing** - Edit secret name, value, and type directly
+- **Multiple Secret Types** - String, Number, JSON, and more
 
-### Infrastructure
-- **Docker** containerization
-- **Docker Compose** for local development
+### 🎫 Access Management
+- **Personal Access Tokens** - API access with scoped permissions
+- **Read/Write Permissions** - Granular token scopes
+- **IP Allowlisting** - Restrict token usage by IP
+- **Optional Expiration** - Time-limited tokens
 
-## 📁 Project Structure
+### 🌐 REST API
+- **Ultra-simple Endpoint** - `GET /api/v1/{secretName}`
+- **Bearer Token Auth** - Secure API access
+- **Auto-context Detection** - Token determines project/env/folder
+- **Multi-format Response** - Plain text and JSON
 
-```
-key-vault/
-├── frontend/                 # React frontend application
-│   ├── src/
-│   │   ├── components/       # Reusable UI components
-│   │   ├── pages/           # Page components
-│   │   ├── hooks/           # Custom React hooks
-│   │   ├── stores/          # Zustand state stores
-│   │   ├── services/        # API service layer
-│   │   ├── types/           # TypeScript type definitions
-│   │   └── utils/           # Utility functions
-│   ├── package.json
-│   └── vite.config.ts
-├── Backend/                 # Node.js backend application
-│   ├── src/
-│   │   ├── routes/          # API route handlers
-│   │   ├── services/        # Business logic
-│   │   ├── middleware/      # Express middleware
-│   │   ├── lib/             # Utility libraries
-│   │   └── config/          # Configuration files
-│   ├── prisma/              # Database schema and migrations
-│   ├── package.json
-│   └── tsconfig.json
-├── docker-compose.yml       # Docker development setup
-├── .github-best-practices.md # GitHub workflow guidelines
-└── README.md               # This file
-```
+### 📊 Audit & Compliance
+- **Complete Audit Trail** - All actions logged with user, IP, timestamp
+- **Filterable Logs** - By date, resource type, action
+- **Detailed Metadata** - Environment, folder, secret context
+- **Security Events** - Track sensitive operations
 
-## 🚀 Getting Started
+### 🔗 Integrations
+- **Vercel** - Sync secrets to Vercel projects (coming soon)
+- **Google OAuth** - Sign in with Google
+- **Email Invitations** - Invite team members via email
+
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- **Node.js** (v18 or higher)
-- **npm** or **yarn**
-- **PostgreSQL** (v13 or higher)
-- **Docker** (optional, for containerized setup)
+- Node.js 18+ 
+- PostgreSQL 14+
+- npm or yarn
 
-### Environment Setup
+### Automated Setup (Recommended)
+
+```bash
+# Run the setup script
+./scripts/setup-local-dev.sh
+
+# Start database
+docker-compose up -d
+
+# Run migrations
+cd Backend && npx prisma migrate dev
+
+# Start backend (Terminal 1)
+cd Backend && npm run dev
+
+# Start frontend (Terminal 2)
+cd frontend && npm run dev
+```
+
+Visit: http://localhost:5173
+
+### Manual Setup
 
 1. **Clone the repository**
-   ```bash
-   git clone https://github.com/amaykorade/key-vault-new.git
-   cd key-vault-new
-   ```
+```bash
+git clone <your-repo-url>
+cd Key\ Vault
+```
 
-2. **Backend Setup**
-   ```bash
-   cd Backend
-   npm install
-   cp env.example .env
-   # Edit .env with your configuration
-   ```
+2. **Setup Backend**
+```bash
+cd Backend
+cp env.example .env
+# Edit .env with your configuration (or use setup script)
+npm install
+npx prisma generate
+npx prisma migrate dev
+npm run dev
+```
 
-3. **Frontend Setup**
-   ```bash
-   cd ../frontend
-   npm install
-   ```
+3. **Setup Frontend**
+```bash
+cd frontend
+echo "VITE_API_URL=http://localhost:4000/api" > .env.local
+npm install
+npm run dev
+```
 
-4. **Database Setup**
-   ```bash
-   cd ../Backend
-   npx prisma migrate dev
-   npx prisma generate
-   ```
+4. **Visit the app**
+```
+http://localhost:5173
+```
 
-### Environment Variables
+### Quick Environment Switching
 
-#### Backend (.env)
-```env
-# Server
-PORT=4000
+```bash
+# Switch to local development
+./scripts/switch-to-local.sh
+
+# Switch to production API (for testing)
+./scripts/switch-to-production.sh https://your-backend.onrender.com
+```
+
+---
+
+## 📦 Tech Stack
+
+### Backend
+- **Runtime**: Node.js + TypeScript
+- **Framework**: Express.js
+- **Database**: PostgreSQL
+- **ORM**: Prisma
+- **Auth**: Passport.js (JWT + Google OAuth)
+- **Encryption**: Node crypto (AES-256-GCM)
+- **Validation**: Zod
+
+### Frontend
+- **Framework**: React 19 + TypeScript
+- **Build Tool**: Vite
+- **Routing**: React Router v7
+- **State Management**: Zustand
+- **Styling**: Tailwind CSS v4
+- **UI Components**: shadcn/ui
+- **HTTP Client**: Fetch API
+- **Forms**: React Hook Form + Zod
+
+### Infrastructure
+- **Hosting**: Render (Backend) + Vercel (Frontend)
+- **Database**: Render PostgreSQL
+- **Deployment**: Automatic on push to main
+
+---
+
+## 📖 Documentation
+
+- **[Quick Deploy Guide](./QUICK_DEPLOY.md)** - Deploy in 15 minutes
+- **[Full Deployment Guide](./DEPLOYMENT_GUIDE.md)** - Comprehensive deployment instructions
+- **[Environment Setup](./ENVIRONMENT_SETUP.md)** - Configure for different environments
+- **[Backend Environment](./Backend/ENV_SETUP.md)** - Backend-specific configuration
+- **[Frontend Environment](./frontend/ENV_SETUP.md)** - Frontend-specific configuration
+
+---
+
+## 🔧 Configuration
+
+### Backend Environment Variables
+
+```bash
+# Essential
 NODE_ENV=development
-
-# Database
-DATABASE_URL=postgresql://username:password@localhost:5432/keyvault
-
-# JWT
-JWT_ACCESS_SECRET=your-access-secret
-JWT_REFRESH_SECRET=your-refresh-secret
-JWT_ACCESS_TTL=15m
-JWT_REFRESH_TTL=7d
-
-# Encryption
-ENCRYPTION_KEY=your-32-byte-encryption-key
+PORT=4000
+DATABASE_URL=postgresql://user:pass@localhost:5432/keyvault
+JWT_ACCESS_SECRET=your_secret_here_min_32_chars
+JWT_REFRESH_SECRET=your_secret_here_min_32_chars
+ENCRYPTION_KEY=your_key_here_min_32_chars
 
 # CORS
 CORS_ORIGIN=http://localhost:5173
+FRONTEND_URL=http://localhost:5173
 
-# Google OAuth (optional)
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-GOOGLE_CALLBACK_URL=http://localhost:4000/api/auth/google/callback
+# Optional
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+SMTP_HOST=smtp.gmail.com
+SMTP_USER=your_email@gmail.com
 ```
 
-#### Frontend (.env)
-```env
+### Frontend Environment Variables
+
+```bash
 VITE_API_URL=http://localhost:4000/api
 ```
 
-### Running the Application
+See [ENVIRONMENT_SETUP.md](./ENVIRONMENT_SETUP.md) for complete configuration guide.
 
-#### Development Mode
+---
 
-1. **Start the backend**
-   ```bash
-   cd Backend
-   npm run dev
-   ```
+## 🏗️ Project Structure
 
-2. **Start the frontend**
-   ```bash
-   cd frontend
-   npm run dev
-   ```
-
-3. **Access the application**
-   - Frontend: http://localhost:5173
-   - Backend API: http://localhost:4000/api
-
-#### Docker Development
-
-```bash
-docker-compose up -d
+```
+Key Vault/
+├── Backend/                 # Express.js backend
+│   ├── prisma/             # Database schema & migrations
+│   ├── src/
+│   │   ├── routes/         # API endpoints
+│   │   ├── services/       # Business logic
+│   │   ├── middleware/     # Auth, audit, etc.
+│   │   └── lib/            # Utilities (encryption, db, etc.)
+│   └── scripts/            # Deployment scripts
+│
+├── frontend/               # React frontend
+│   ├── src/
+│   │   ├── pages/          # Route components
+│   │   ├── components/     # Reusable UI components
+│   │   ├── stores/         # Zustand state management
+│   │   ├── services/       # API service layer
+│   │   └── hooks/          # Custom React hooks
+│   └── public/             # Static assets
+│
+└── docs/                   # Documentation
 ```
 
-## 📖 API Documentation
+---
 
-### Authentication Endpoints
+## 🎯 Key Features in Detail
 
-- `POST /api/auth/login` - User login
-- `POST /api/auth/signup` - User registration
-- `GET /api/auth/google` - Google OAuth login
-- `GET /api/auth/google/callback` - Google OAuth callback
-- `POST /api/auth/refresh` - Refresh access token
-- `POST /api/auth/logout` - User logout
+### Secrets Management
 
-### Organization Endpoints
+- **Inline Editing**: Click to edit secret name, value, or type
+- **Reveal on Demand**: Secrets hidden by default, click to reveal (logged)
+- **Unique Names**: Automatic generation of unique secret names
+- **Environment Columns**: Drag-and-drop between Dev/Staging/Production
+- **Folder Organization**: Group related secrets together
+- **Bulk Operations**: Select and manage multiple secrets
 
-- `GET /api/organizations` - Get user organizations
-- `POST /api/organizations` - Create organization
-- `GET /api/organizations/:id` - Get organization details
-- `PUT /api/organizations/:id` - Update organization
-- `DELETE /api/organizations/:id` - Delete organization
+### Access Control
 
-### Project Endpoints
+- **Token Scoping**: Limit tokens to specific projects, environments, folders
+- **Permission Levels**: Read-only or read-write access
+- **IP Allowlisting**: Restrict token usage to specific IPs
+- **Expiration**: Optional time-based token expiration
+- **One-time View**: Token shown once after creation
+- **Revocation**: Instantly revoke compromised tokens
 
-- `GET /api/projects` - Get user projects
-- `POST /api/projects/organizations/:orgId/projects` - Create project
-- `GET /api/projects/:id` - Get project details
-- `PUT /api/projects/:id` - Update project
-- `DELETE /api/projects/:id` - Delete project
+### Audit Logging
 
-### Secret Endpoints
+- **Comprehensive Tracking**: Every action logged with context
+- **User Attribution**: Track who performed each action
+- **IP Logging**: Record source IP for security events
+- **Metadata**: Environment, folder, secret details
+- **Filtering**: By date range, resource type, action type
+- **Expandable Details**: Click logs for full information
 
-- `GET /api/secrets/projects/:projectId/secrets` - Get project secrets
-- `POST /api/secrets/projects/:projectId/secrets` - Create secret
-- `GET /api/secrets/:id` - Get secret details
-- `PUT /api/secrets/:id` - Update secret
-- `DELETE /api/secrets/:id` - Delete secret
+---
+
+## 🔐 Security
+
+- ✅ **Encryption at Rest**: All secrets encrypted with AES-256-GCM
+- ✅ **Secure Transport**: HTTPS enforced in production
+- ✅ **JWT Authentication**: Secure token-based auth
+- ✅ **Password Hashing**: bcrypt with salt
+- ✅ **CORS Protection**: Configured for your frontend only
+- ✅ **Audit Logging**: Complete audit trail
+- ✅ **Input Validation**: Zod schemas on all inputs
+- ✅ **SQL Injection Protection**: Prisma ORM
+- ✅ **XSS Protection**: React escaping + Helmet.js
+- ✅ **CSRF Protection**: SameSite cookies
+
+---
+
+## 📊 API Documentation
+
+### Authentication
+
+All API requests require a Bearer token:
+
+```bash
+Authorization: Bearer your_token_here
+```
+
+### Get Secret
+
+```bash
+GET /api/v1/{secretName}
+```
+
+**Example:**
+```bash
+curl -H "Authorization: Bearer kvt_..." \
+  https://your-api.com/api/v1/DATABASE_URL
+```
+
+**Response:**
+```
+postgresql://user:pass@host:5432/db
+```
+
+See full API documentation in the app at `/api-docs` (coming soon).
+
+---
+
+## 🚢 Deployment
+
+### Quick Deploy
+
+1. **Deploy Backend to Render**
+   - Create PostgreSQL database
+   - Create Web Service
+   - Set environment variables
+   - Deploy
+
+2. **Deploy Frontend to Vercel**
+   - Import GitHub repository
+   - Set `VITE_API_URL`
+   - Deploy
+
+3. **Update CORS**
+   - Set `CORS_ORIGIN` in Render to Vercel URL
+
+See [QUICK_DEPLOY.md](./QUICK_DEPLOY.md) for step-by-step instructions.
+
+---
 
 ## 🧪 Testing
 
 ```bash
-# Backend tests
+# Backend tests (coming soon)
 cd Backend
 npm test
 
-# Frontend tests
+# Frontend tests (coming soon)
 cd frontend
 npm test
 ```
 
-## 🚀 Deployment
-
-### Production Build
-
-```bash
-# Build frontend
-cd frontend
-npm run build
-
-# Build backend
-cd ../Backend
-npm run build
-```
-
-### Environment Variables for Production
-
-Ensure all environment variables are properly set for production, including:
-- Strong JWT secrets
-- Production database URL
-- Proper CORS origins
-- Google OAuth credentials
+---
 
 ## 🤝 Contributing
 
+Contributions are welcome! Please follow these steps:
+
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-Please read our [GitHub Best Practices Guide](.github-best-practices.md) for detailed contribution guidelines.
+---
 
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🔒 Security
+---
 
-- All passwords are hashed using bcrypt
-- Secrets are encrypted at rest using AES-256
-- JWT tokens for secure API access
-- CORS protection configured
-- Input validation and sanitization
-- Rate limiting on authentication endpoints
+## 🙏 Acknowledgments
 
-## 📞 Support
-
-If you have any questions or need help, please:
-1. Check the [Issues](https://github.com/amaykorade/key-vault-new/issues) page
-2. Create a new issue if your question isn't answered
-3. Contact the maintainers
-
-## 🗺 Roadmap
-
-- [ ] API key management
-- [ ] Secret versioning and rollback
-- [ ] Advanced audit logging
-- [ ] Secret sharing with expiration
-- [ ] Integration with CI/CD tools
-- [ ] Mobile application
-- [ ] Advanced search and filtering
-- [ ] Secret templates and presets
+- Built with [shadcn/ui](https://ui.shadcn.com/)
+- Icons by [Lucide](https://lucide.dev/)
+- Inspired by modern DevOps practices
 
 ---
 
-Built with ❤️ by [Amay Korade](https://github.com/amaykorade)
+## 📞 Support
+
+- 📧 Email: support@keyvault.com (update with your email)
+- 🐛 Issues: [GitHub Issues](https://github.com/your-repo/issues)
+- 📖 Docs: See documentation files in the repository
+
+---
+
+## 🗺️ Roadmap
+
+- [ ] Vercel integration (auto-sync secrets)
+- [ ] AWS Secrets Manager integration
+- [ ] Google Cloud Secret Manager integration
+- [ ] Secret versioning and rollback
+- [ ] Secret templates
+- [ ] CLI tool for secret management
+- [ ] Terraform provider
+- [ ] Kubernetes operator
+- [ ] Secret rotation policies
+- [ ] Multi-factor authentication
+- [ ] SSO integration (Okta, Auth0)
+- [ ] Advanced audit analytics
+- [ ] Secret sharing with expiration
+- [ ] Mobile app
+- [ ] Browser extension
+
+---
+
+**Built with ❤️ for secure secrets management**

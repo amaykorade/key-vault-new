@@ -1,0 +1,56 @@
+# Cursor AI Rules for Key Vault Project
+
+## Project Context
+This is a secrets management platform (Key Vault) with a TypeScript backend (Express + Prisma) and React frontend.
+
+## Environment Configuration
+- Backend API URL is configured via `VITE_API_URL` environment variable
+- Never hardcode API URLs - always use environment variables
+- Local development: http://localhost:4000/api
+- Production: Set via Vercel environment variables
+
+## Deployment Targets
+- **Backend**: Render (with PostgreSQL)
+- **Frontend**: Vercel
+- **Database**: Render PostgreSQL
+
+## Important Files
+- Backend config: `Backend/src/config/env.ts`
+- Frontend API service: `frontend/src/services/api.ts`
+- Environment examples: `Backend/env.example`, `frontend/ENV_SETUP.md`
+
+## Development Workflow
+1. Use `./scripts/setup-local-dev.sh` for initial setup
+2. Use `./scripts/switch-to-local.sh` for local API
+3. Use `./scripts/switch-to-production.sh` for testing against production
+
+## Security Guidelines
+- All secrets must be encrypted using the encryption service
+- Never log sensitive data (secrets, tokens, passwords)
+- Always use environment variables for configuration
+- JWT secrets must be at least 32 characters
+- Use parameterized queries (Prisma handles this)
+
+## Code Style
+- TypeScript strict mode enabled
+- Use Zod for validation
+- Follow existing patterns in services and routes
+- Add audit logging for sensitive operations
+
+## API Design
+- RESTful endpoints under `/api`
+- Use proper HTTP status codes
+- Return consistent error formats
+- Include authentication middleware where needed
+
+## Database
+- Use Prisma for all database operations
+- Create migrations for schema changes: `npx prisma migrate dev`
+- Never modify database directly in production
+
+## Testing New Features
+- Test locally first
+- Verify audit logs are working
+- Check CORS configuration
+- Test with different permission levels
+
