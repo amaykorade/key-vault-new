@@ -56,8 +56,8 @@ app.use(passport.session());
 app.get('/health', async (_req, res) => {
 	try {
 		// Check database connection
-		const { prisma } = require('./lib/db');
-		await prisma.$queryRaw`SELECT 1`;
+		const { db } = require('./lib/db');
+		await db.$queryRaw`SELECT 1`;
 		
 		res.status(200).json({ 
 			status: 'ok',
