@@ -16,6 +16,7 @@ import apiKeysRoutes from './routes/api-keys';
 import tokensRoutes from './routes/tokens';
 import vercelRoutes from './routes/vercel';
 import { requireAuth, AuthRequest } from './middleware/auth';
+import cliRoutes from './routes/cli';
 import folderRoutes from './routes/folders';
 
 const app = express();
@@ -108,6 +109,7 @@ app.use('/api', tokensRoutes);
 // Vercel integration routes
 app.use('/api/vercel', vercelRoutes);
 app.use('/api/auth/vercel', vercelRoutes); // OAuth callback
+app.use('/api', cliRoutes);
 
 // Protected route example
 app.get('/api/me', requireAuth, (req: AuthRequest, res) => {
