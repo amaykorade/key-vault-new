@@ -22,6 +22,7 @@ model User {
   ownedOrgs        Organization[]
   createdSecrets   Secret[]
   createdFolders   Folder[]
+  cliTokens        CliToken[]
   teamMemberships  TeamMembership[]
   createdTeams     Team[]
   sentInvitations  Invitation[]
@@ -422,4 +423,18 @@ model FolderVercelSync {
   @@unique([projectId, environment, folder])
   @@index([projectId])
   @@index([vercelProjectId])
+}
+
+model CliToken {
+  id          String   @id @default(uuid())
+  tokenHash   String   @unique
+  userId      String
+  name        String?
+  createdAt   DateTime @default(now())
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
