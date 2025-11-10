@@ -6,6 +6,7 @@ import { CliTokenService } from '../services/cli-token';
 import { db } from '../lib/db';
 import { AccessControlService } from '../services/access-control';
 import { decryptSecret } from '../lib/encryption';
+import { AuditService } from '../services/audit';
 
 const router = Router();
 
@@ -17,6 +18,13 @@ router.post('/cli/token', requireAuth, async (req: AuthRequest, res) => {
   try {
     const { name } = CreateCliTokenSchema.parse(req.body ?? {});
     const { token, record } = await CliTokenService.createToken(req.user!.id, name);
+    await AuditService.logCliTokenCreate(
+      req.user!.id,
+      record.id,
+      name,
+      req.ip || req.connection?.remoteAddress,
+      req.headers['user-agent']
+    ).catch(console.error);
     res.status(201).json({ token, tokenMeta: record });
   } catch (error) {
     console.error('[cli] create token error', error);
@@ -30,10 +38,22 @@ router.get('/cli/tokens', requireAuth, async (req: AuthRequest, res) => {
 });
 
 router.delete('/cli/token/:id', requireAuth, async (req: AuthRequest, res) => {
-  const success = await CliTokenService.deleteToken(req.user!.id, req.params.id);
-  if (!success) {
+  const token = await db.cliToken.findFirst({
+    where: { id: req.params.id, userId: req.user!.id },
+    select: { id: true, name: true },
+  });
+
+  if (!token) {
     return res.status(404).json({ error: 'Token not found' });
   }
+
+  await CliTokenService.deleteToken(req.user!.id, req.params.id);
+  await AuditService.logCliTokenDelete(
+    req.user!.id,
+    token.id,
+    token.name || undefined,
+    req.ip || req.connection?.remoteAddress
+  ).catch(console.error);
   res.status(204).send();
 });
 
@@ -183,6 +203,15 @@ router.get('/cli/secrets/download', requireCliAuth, async (req: CliAuthRequest, 
     return res.status(403).json({ error: 'Access denied' });
   }
 
+  const project = await db.project.findUnique({
+    where: { id: projectId },
+    select: {
+      id: true,
+      name: true,
+      organizationId: true,
+    },
+  });
+
   const secrets = await db.secret.findMany({
     where: {
       projectId,
@@ -196,6 +225,17 @@ router.get('/cli/secrets/download', requireCliAuth, async (req: CliAuthRequest, 
     acc[secret.name] = decryptSecret(secret.value);
     return acc;
   }, {});
+
+  await AuditService.logCliSecretsFetch(
+    req.user!.id,
+    projectId,
+    project?.name || 'Unknown Project',
+    project?.organizationId || undefined,
+    environment,
+    folder,
+    secrets.length,
+    req.ip || req.connection?.remoteAddress || undefined
+  ).catch(console.error);
 
   if (format === 'dotenv') {
     const dotenv = Object.entries(secretMap)

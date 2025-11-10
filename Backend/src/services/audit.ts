@@ -548,4 +548,73 @@ export class AuditService {
       take: limit,
     });
   }
+
+  /**
+   * CLI-specific auditing
+   */
+  static async logCliTokenCreate(
+    userId: string,
+    tokenId: string,
+    tokenName?: string,
+    ipAddress?: string,
+    userAgent?: string
+  ): Promise<void> {
+    await this.log({
+      userId,
+      tokenId,
+      eventType: 'cli_token',
+      action: 'create',
+      resourceName: tokenName ? `CLI Token: ${tokenName}` : 'CLI Token',
+      resourceType: 'cli_token',
+      description: 'CLI token created via CLI exchange',
+      ipAddress,
+      userAgent,
+    });
+  }
+
+  static async logCliTokenDelete(
+    userId: string,
+    tokenId: string,
+    tokenName?: string,
+    ipAddress?: string
+  ): Promise<void> {
+    await this.log({
+      userId,
+      tokenId,
+      eventType: 'cli_token',
+      action: 'delete',
+      resourceName: tokenName ? `CLI Token: ${tokenName}` : 'CLI Token',
+      resourceType: 'cli_token',
+      description: 'CLI token revoked',
+      ipAddress,
+    });
+  }
+
+  static async logCliSecretsFetch(
+    userId: string,
+    projectId: string,
+    projectName: string,
+    organizationId?: string,
+    environment?: string,
+    folder?: string,
+    secretCount?: number,
+    ipAddress?: string
+  ): Promise<void> {
+    await this.log({
+      userId,
+      projectId,
+      organizationId,
+      eventType: 'cli_fetch',
+      action: 'fetch',
+      resourceName: `CLI Secrets Fetch: ${projectName}`,
+      resourceType: 'cli_fetch',
+      environment,
+      folder,
+      metadata: {
+        secretCount: secretCount ?? 0,
+      },
+      description: `CLI fetched ${secretCount ?? 0} secrets from ${environment || 'all environments'}/${folder || 'all folders'}`,
+      ipAddress,
+    });
+  }
 }
