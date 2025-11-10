@@ -18,7 +18,16 @@ import type {
   Folder
 } from '../types';
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+const resolveDefaultApiBase = () => {
+  if (typeof window !== 'undefined' && window.location) {
+    return `${window.location.origin}/api`;
+  }
+  return 'http://localhost:4000/api';
+};
+
+export const API_BASE_URL = (import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL.trim())
+  ? import.meta.env.VITE_API_URL.trim()
+  : resolveDefaultApiBase();
 
 class ApiError extends Error {
   status: number;
