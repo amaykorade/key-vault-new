@@ -196,6 +196,18 @@ export interface OrganizationSearchParams {
   search?: string;
 }
 
+// Folder types
+export interface Folder {
+  id: string;
+  name: string;
+  slug: string;
+  environment: string;
+  description?: string;
+  secretCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Audit Log types
 export interface AuditLog {
   id: string;

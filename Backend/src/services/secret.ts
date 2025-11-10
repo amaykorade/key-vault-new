@@ -2,6 +2,7 @@ import { db } from '../lib/db';
 import { z } from 'zod';
 import { encryptSecret, decryptSecret, maskSecret } from '../lib/encryption';
 import { AccessControlService } from './access-control';
+import { FolderService } from './folder';
 
 export const SecretSchema = {
   create: z.object({
@@ -49,6 +50,8 @@ export class SecretService {
     if (existingSecret) {
       throw new Error(`Secret with name "${data.name}" already exists in this project for environment "${data.environment}" and folder "${data.folder}"`);
     }
+
+    await FolderService.ensureFolderRecord(projectId, data.environment, data.folder, userId);
 
     // Encrypt the secret value
     const encryptedValue = encryptSecret(data.value);
@@ -189,11 +192,17 @@ export class SecretService {
     }
 
     // Prepare update data
+    const targetEnvironment = data.environment || secret.environment;
+    const targetFolder = data.folder || secret.folder || 'default';
+
+    await FolderService.ensureFolderRecord(secret.projectId, targetEnvironment, targetFolder, userId);
+
     const updateData: any = {
       name: data.name,
       description: data.description,
       type: data.type,
       environment: data.environment,
+      folder: data.folder,
     };
 
     // Encrypt new value if provided

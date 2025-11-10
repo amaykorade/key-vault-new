@@ -16,6 +16,7 @@ import apiKeysRoutes from './routes/api-keys';
 import tokensRoutes from './routes/tokens';
 import vercelRoutes from './routes/vercel';
 import { requireAuth, AuthRequest } from './middleware/auth';
+import folderRoutes from './routes/folders';
 
 const app = express();
 
@@ -88,6 +89,7 @@ app.use('/api/projects', projectRoutes);
 
 // Secret routes
 app.use('/api/secrets', secretRoutes);
+app.use('/api/projects', folderRoutes);
 
 // Team routes
 app.use('/api', teamRoutes);

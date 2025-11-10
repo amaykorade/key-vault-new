@@ -32,10 +32,21 @@ export function Sidebar() {
   // Restore last selected workspace from localStorage
   useEffect(() => {
     const lastWorkspaceId = localStorage.getItem('lastWorkspaceId');
-    if (lastWorkspaceId && organizations.length > 0) {
+    if (!lastWorkspaceId || organizations.length === 0) {
+      return;
+    }
+
       const workspace = organizations.find((org) => org.id === lastWorkspaceId);
+
       if (workspace && !currentOrganization) {
         setCurrentOrganization(workspace);
+      return;
+    }
+
+    if (!workspace) {
+      localStorage.removeItem('lastWorkspaceId');
+      if (currentOrganization?.id === lastWorkspaceId) {
+        setCurrentOrganization(null);
       }
     }
   }, [organizations, currentOrganization, setCurrentOrganization]);

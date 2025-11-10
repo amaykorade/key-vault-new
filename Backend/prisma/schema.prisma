@@ -21,6 +21,7 @@ model User {
   memberships      Membership[]
   ownedOrgs        Organization[]
   createdSecrets   Secret[]
+  createdFolders   Folder[]
   teamMemberships  TeamMembership[]
   createdTeams     Team[]
   sentInvitations  Invitation[]
@@ -116,6 +117,7 @@ model Project {
   updatedAt      DateTime        @updatedAt
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   secrets        Secret[]
+  folders        Folder[]
   teams          TeamProject[]
   members        ProjectMember[]
   auditLogs      AuditLog[]
@@ -171,6 +173,25 @@ model Secret {
   @@index([environment])
   @@index([folder])
   @@unique([projectId, name, environment, folder])
+}
+
+model Folder {
+  id            String   @id @default(uuid())
+  projectId     String
+  environment   String
+  name          String
+  slug          String
+  description   String?
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy     User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([environment])
+  @@unique([projectId, environment, slug])
 }
 
 model Team {

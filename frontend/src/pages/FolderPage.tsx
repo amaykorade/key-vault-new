@@ -10,7 +10,7 @@ import { SecretForm } from '../components/forms/SecretForm';
 import { SecretModal } from '../components/forms/SecretModal';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { apiService } from '../services/api';
-import type { Secret } from '../types';
+import type { Project, Secret } from '../types';
 
 type Tab = 'secrets' | 'access' | 'logs' | 'integrations';
 
@@ -54,6 +54,7 @@ export function FolderPage() {
   const navigate = useNavigate();
   const { id, env, folder } = useParams<{ id: string; env: string; folder: string }>();
 
+  const [projectDetails, setProjectDetails] = useState<Project | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('secrets');
   const [secrets, setSecrets] = useState<Secret[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -235,19 +236,50 @@ export function FolderPage() {
     return filtered;
   }, [logs, logDateFilter, logTypeFilter]);
 
-  const headerTitle = useMemo(() => {
-    // Format folder name properly
-    const folderName = folder || 'default';
-    const formattedFolder = folderName
-      .split(/[-_]/)
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(' ');
-    
-    // Format environment name
-    const formattedEnv = env ? env.charAt(0).toUpperCase() + env.slice(1).toLowerCase() : 'Unknown';
-    
-    return `${formattedFolder} / ${formattedEnv}`;
-  }, [env, folder]);
+const environmentLabel = useMemo(() => {
+  if (!env) return 'Unknown Environment';
+  return env
+    .split(/[-_]/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}, [env]);
+
+const folderLabel = useMemo(() => {
+  const folderName = folder || 'default';
+  return folderName
+    .split(/[-_]/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}, [folder]);
+
+const breadcrumbItems = useMemo(() => {
+  const items: Array<{ label: string; onClick?: () => void }> = [
+    { label: 'Projects', onClick: () => navigate('/projects') },
+  ];
+
+  if (projectDetails?.id) {
+    items.push({
+      label: projectDetails.name,
+      onClick: () => navigate(`/projects/${projectDetails.id}`),
+    });
+  } else {
+    items.push({
+      label: 'Project',
+      onClick: () => navigate('/projects'),
+    });
+  }
+
+  items.push({
+    label: environmentLabel,
+    onClick: id ? () => navigate(`/projects/${id}`) : undefined,
+  });
+
+  items.push({
+    label: folderLabel,
+  });
+
+  return items;
+}, [navigate, projectDetails, environmentLabel, folderLabel, id, env]);
 
   useEffect(() => {
     fetchSecrets();
@@ -306,6 +338,7 @@ export function FolderPage() {
     try {
       // Get project to find organizationId
       const projectRes = await apiService.getProject(id);
+      setProjectDetails(projectRes.project);
       const orgId = projectRes.project?.organizationId;
       
       if (!orgId) {
@@ -410,14 +443,56 @@ export function FolderPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-white transition-colors">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="mt-1 text-gray-400 hover:text-white transition-colors"
+            aria-label="Go back"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
           </button>
-          <h1 className="text-2xl font-bold text-white">{headerTitle}</h1>
+          <div>
+            <nav aria-label="Breadcrumb">
+              <ol className="flex items-center gap-2 text-sm text-gray-400">
+                {breadcrumbItems.map((item, index) => (
+                  <li key={`${item.label}-${index}`} className="flex items-center gap-2">
+                    {index !== 0 && (
+                      <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    )}
+                    {item.onClick ? (
+                      <button
+                        type="button"
+                        onClick={item.onClick}
+                        className="hover:text-gray-200 transition-colors"
+                      >
+                        {item.label}
+                      </button>
+                    ) : (
+                      <span className="text-gray-300">{item.label}</span>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </nav>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <h1 className="text-2xl font-bold text-white">{folderLabel}</h1>
+              <span className="text-xs uppercase tracking-wide px-2 py-0.5 rounded-full bg-gray-800 border border-gray-700 text-gray-300">
+                {environmentLabel}
+              </span>
+              {projectDetails?.organization?.name && (
+                <span className="text-xs text-gray-500">
+                  {projectDetails.organization.name}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
-        {/* Removed top-level Add Secret button */}
+        {/* Right side intentionally left empty for future actions */}
       </div>
 
       {/* Tabs */}
@@ -525,7 +600,7 @@ export function FolderPage() {
                 </div>
                 <h3 className="text-base font-medium text-white mb-2">No secrets in this folder</h3>
                 <p className="text-gray-400 mb-5 text-sm">Create your first secret to get started</p>
-                <Button variant="gradient" size="sm" onClick={() => setShowCreateSecret(true)}>
+                <Button variant="gradient" size="sm" onClick={handleQuickCreateSecret}>
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                   </svg>

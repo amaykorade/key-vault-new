@@ -85,29 +85,29 @@ Visit: http://localhost:5173
 ### Manual Setup
 
 1. **Clone the repository**
-```bash
+   ```bash
 git clone <your-repo-url>
 cd Key\ Vault
-```
+   ```
 
 2. **Setup Backend**
-```bash
-cd Backend
+   ```bash
+   cd Backend
 cp env.example .env
 # Edit .env with your configuration (or use setup script)
-npm install
+   npm install
 npx prisma generate
 npx prisma migrate dev
 npm run dev
-```
+   ```
 
 3. **Setup Frontend**
-```bash
+   ```bash
 cd frontend
 echo "VITE_API_URL=http://localhost:4000/api" > .env.local
-npm install
+   npm install
 npm run dev
-```
+   ```
 
 4. **Visit the app**
 ```
@@ -116,7 +116,7 @@ http://localhost:5173
 
 ### Quick Environment Switching
 
-```bash
+   ```bash
 # Switch to local development
 ./scripts/switch-to-local.sh
 
@@ -277,7 +277,7 @@ Key Vault/
 
 All API requests require a Bearer token:
 
-```bash
+   ```bash
 Authorization: Bearer your_token_here
 ```
 

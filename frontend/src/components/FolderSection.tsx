@@ -1,39 +1,71 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from './ui/Button';
-import type { Secret } from '../types';
+import type { Secret, Folder } from '../types';
 
 interface FolderSectionProps {
-  folderName: string;
+  folder: Folder;
   secrets: Secret[];
   environment: string;
-  onFolderClick: (environment: string, folder: string) => void;
+  onFolderClick: (environment: string, folderSlug: string) => void;
   canWrite: boolean;
   defaultCollapsed?: boolean;
-  onRenameFolder?: (environment: string, oldFolder: string, newFolder: string) => void;
+  onRenameFolder?: (folderId: string, name: string) => Promise<void> | void;
+  onDeleteFolder?: (folderId: string) => Promise<void> | void;
 }
 
 export function FolderSection({
-  folderName,
+  folder,
   secrets,
   environment,
   onFolderClick,
   canWrite,
   defaultCollapsed = true,
   onRenameFolder,
+  onDeleteFolder,
 }: FolderSectionProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
-  const [editedFolder, setEditedFolder] = useState(folderName);
-  const displayName = folderName === 'default' ? 'Default' : folderName;
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [editedFolder, setEditedFolder] = useState(folder.name);
+  const displayName = folder.slug === 'default' ? 'Default' : folder.name;
   const formattedName = displayName
     .replace(/_/g, ' ')
     .replace(/([A-Z])/g, ' $1')
     .replace(/^./, str => str.toUpperCase())
     .trim();
 
+  const secretCount = folder.secretCount ?? secrets.length;
+
+  useEffect(() => {
+    setEditedFolder(folder.name);
+  }, [folder.name]);
+
   const handleHeaderClick = () => {
     if (isRenaming) return;
-    onFolderClick(environment, folderName);
+    onFolderClick(environment, folder.slug);
+  };
+
+  const handleRename = async (nextName: string) => {
+    if (!onRenameFolder || nextName.trim() === folder.name) return;
+    try {
+      await Promise.resolve(onRenameFolder(folder.id, nextName.trim()));
+    } catch (error) {
+      console.error('Failed to rename folder:', error);
+      setEditedFolder(folder.name);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!onDeleteFolder) return;
+    try {
+      setIsDeleting(true);
+      await Promise.resolve(onDeleteFolder(folder.id));
+      setMenuOpen(false);
+    } catch (error) {
+      console.error('Failed to delete folder:', error);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -54,25 +86,25 @@ export function FolderSection({
               onChange={(e) => setEditedFolder(e.target.value)}
               autoFocus
               onBlur={() => {
-                const newFolder = editedFolder.trim().toLowerCase().replace(/\s+/g, '_');
-                if (newFolder && newFolder !== folderName && onRenameFolder) {
-                  onRenameFolder(environment, folderName, newFolder);
+                const nextName = editedFolder.trim();
+                if (nextName) {
+                  handleRename(nextName);
                 } else {
-                  setEditedFolder(folderName);
+                  setEditedFolder(folder.name);
                 }
                 setIsRenaming(false);
                 setMenuOpen(false);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
-                  const newFolder = editedFolder.trim().toLowerCase().replace(/\s+/g, '_');
-                  if (newFolder && newFolder !== folderName && onRenameFolder) {
-                    onRenameFolder(environment, folderName, newFolder);
+                  const nextName = editedFolder.trim();
+                  if (nextName) {
+                    handleRename(nextName);
                   }
                   setIsRenaming(false);
                   setMenuOpen(false);
                 } else if (e.key === 'Escape') {
-                  setEditedFolder(folderName);
+                  setEditedFolder(folder.name);
                   setIsRenaming(false);
                   setMenuOpen(false);
                 }
@@ -84,7 +116,7 @@ export function FolderSection({
             </span>
           )}
           <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-700 text-gray-400 flex-shrink-0">
-            {secrets.length}
+            {secretCount}
           </span>
         </div>
         <div className="relative flex items-center gap-2" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
@@ -114,6 +146,15 @@ export function FolderSection({
                   >
                     Edit name
                   </button>
+                  {onDeleteFolder && folder.slug !== 'default' && (
+                    <button
+                      className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-red-900/20 disabled:opacity-50"
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? 'Deleting…' : 'Delete'}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

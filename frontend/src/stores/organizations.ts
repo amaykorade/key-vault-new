@@ -33,6 +33,9 @@ export const useOrganizationsStore = create<OrganizationsStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await apiService.getOrganizations();
+      if (import.meta.env.DEV) {
+        console.debug('[organizations] fetched', response.organizations);
+      }
       set({
         organizations: response.organizations,
         isLoading: false,

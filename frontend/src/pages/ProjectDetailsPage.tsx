@@ -12,7 +12,7 @@ import { EnvironmentColumn } from '../components/EnvironmentColumn';
 import { apiService } from '../services/api';
 import { useAuthStore } from '../stores/auth';
 import toast from 'react-hot-toast';
-import type { Project, Secret } from '../types';
+import type { Project, Secret, Folder } from '../types';
 
 const ENVIRONMENTS = ['development', 'staging', 'production'] as const;
 type Environment = string;
@@ -30,6 +30,8 @@ export function ProjectDetailsPage() {
   // Secrets state
   const [secrets, setSecrets] = useState<Secret[]>([]);
   const [isLoadingSecrets, setIsLoadingSecrets] = useState(false);
+  const [folders, setFolders] = useState<Record<string, Folder[]>>({});
+  const [isLoadingFolders, setIsLoadingFolders] = useState(false);
   
   // Column order state (persisted in localStorage)
   const [columnOrder, setColumnOrder] = useState<Environment[]>(() => {
@@ -93,8 +95,24 @@ export function ProjectDetailsPage() {
     if (id) {
       fetchProject();
       fetchSecrets();
+      fetchFolders();
     }
   }, [id]);
+
+  useEffect(() => {
+    setFolders((prev) => {
+      let changed = false;
+      const next: Record<string, Folder[]> = { ...prev };
+      columnOrder.forEach((env) => {
+        const key = env.toLowerCase();
+        if (!(key in next)) {
+          next[key] = [];
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [columnOrder]);
 
   // Persist column order when it changes
   useEffect(() => {
@@ -138,6 +156,63 @@ export function ProjectDetailsPage() {
       console.error('Failed to fetch secrets:', err);
     } finally {
       setIsLoadingSecrets(false);
+    }
+  };
+
+  const fetchFolders = async () => {
+    if (!id) return;
+
+    try {
+      setIsLoadingFolders(true);
+      const response = await apiService.getProjectFolders(id);
+
+      const map: Record<string, Folder[]> = {};
+      response.folders.forEach((folder) => {
+        const env = (folder.environment || 'development').toLowerCase();
+        if (!map[env]) map[env] = [];
+        map[env].push({
+          ...folder,
+          environment: env,
+        });
+      });
+
+      Object.keys(map).forEach((env) => {
+        map[env].sort((a, b) => a.name.localeCompare(b.name));
+      });
+
+      const missingEnvironments: string[] = [];
+      response.folders.forEach((folder) => {
+        const env = (folder.environment || 'development').toLowerCase();
+        if (!columnOrder.includes(env) && !missingEnvironments.includes(env)) {
+          missingEnvironments.push(env);
+        }
+      });
+
+      if (missingEnvironments.length > 0) {
+        setColumnOrder((prev) => {
+          const next = [...prev];
+          missingEnvironments.forEach((env) => {
+            if (!next.includes(env)) {
+              next.push(env);
+            }
+          });
+          return next;
+        });
+      }
+
+      const environments = new Set([...columnOrder, ...missingEnvironments]);
+      const normalized: Record<string, Folder[]> = {};
+
+      environments.forEach((env) => {
+        normalized[env] = map[env]?.slice() ?? [];
+      });
+
+      setFolders(normalized);
+    } catch (err) {
+      console.error('Failed to fetch folders:', err);
+      setFolders({});
+    } finally {
+      setIsLoadingFolders(false);
     }
   };
 
@@ -260,19 +335,54 @@ export function ProjectDetailsPage() {
     navigate(`/projects/${id}/env/${envSeg}/folders/${folderSeg}`);
   };
 
-  const handleRenameFolder = async (environment: string, oldFolder: string, newFolder: string) => {
+  const handleCreateFolder = async (environment: string, name: string) => {
     if (!id) return;
-    // Update all secrets in this project matching env+folder
-    const toUpdate = secrets.filter(
-      (s) => (s.environment || '').toLowerCase() === environment && (s.folder || 'default') === oldFolder
-    );
     try {
-      await Promise.all(
-        toUpdate.map((s) => apiService.updateSecret(s.id, { folder: newFolder } as any))
-      );
-      await fetchSecrets();
-    } catch (err) {
-      console.error('Failed to rename folder:', err);
+      await apiService.createFolder(id, {
+        environment,
+        name,
+      });
+      toast.success('Folder created successfully');
+      await fetchFolders();
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.error ||
+        err?.message ||
+        'Failed to create folder';
+      toast.error(message);
+      throw err;
+    }
+  };
+
+  const handleRenameFolder = async (folderId: string, name: string) => {
+    if (!id) return;
+    try {
+      await apiService.updateFolder(id, folderId, { name });
+      toast.success('Folder renamed successfully');
+      await fetchFolders();
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.error ||
+        err?.message ||
+        'Failed to rename folder';
+      toast.error(message);
+      throw err;
+    }
+  };
+
+  const handleDeleteFolder = async (folderId: string) => {
+    if (!id) return;
+    try {
+      await apiService.deleteFolder(id, folderId);
+      toast.success('Folder deleted successfully');
+      await fetchFolders();
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.error ||
+        err?.message ||
+        'Failed to delete folder';
+      toast.error(message);
+      throw err;
     }
   };
 
@@ -294,6 +404,7 @@ export function ProjectDetailsPage() {
       await apiService.createSecret(id, data);
       toast.success('Secret created successfully');
       await fetchSecrets();
+      await fetchFolders();
       setShowCreateSecret(false);
       setPreselectedEnvironment(null);
       setPreselectedFolder(null);
@@ -312,6 +423,7 @@ export function ProjectDetailsPage() {
       await apiService.updateSecret(selectedSecret.id, data);
       toast.success('Secret updated successfully');
       await fetchSecrets();
+      await fetchFolders();
       setShowSecretModal(false);
       setSelectedSecret(null);
     } catch (err: any) {
@@ -334,6 +446,7 @@ export function ProjectDetailsPage() {
       await apiService.deleteSecret(secretToDelete.id);
       toast.success('Secret deleted successfully');
       await fetchSecrets();
+      await fetchFolders();
       setShowDeleteSecretModal(false);
       setSecretToDelete(null);
       setShowSecretModal(false);
@@ -449,23 +562,30 @@ export function ProjectDetailsPage() {
             strategy={horizontalListSortingStrategy}
           >
             <div className="flex flex-col md:flex-row gap-4 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0">
-              {columnOrder.map((env) => (
+              {columnOrder.map((env) => {
+                const envKey = env.toLowerCase();
+                return (
                 <EnvironmentColumn
                   key={env}
                   id={env}
-                  environment={env as any}
-                  secrets={secretsByEnvironment[env] || []}
+                  environment={env}
+                  secrets={secretsByEnvironment[envKey] || []}
+                  folders={folders[envKey] || []}
                   onAddSecret={handleAddSecret}
                   onFolderClick={handleFolderClick}
+                  onCreateFolder={handleCreateFolder}
                   onRenameFolder={handleRenameFolder}
+                  onDeleteFolder={handleDeleteFolder}
                   onRenameEnvironment={requestRenameEnvironment}
                   onDeleteEnvironment={requestDeleteEnvironment}
                   canWrite={(project as any).userAccess?.canWrite ?? true}
                   canDelete={(project as any).userAccess?.canDelete ?? true}
                   isLoading={isLoadingSecrets}
+                  isLoadingFolders={isLoadingFolders}
                   label={envMeta[env]?.label || (env.charAt(0).toUpperCase() + env.slice(1))}
                 />
-              ))}
+              );
+              })}
             </div>
           </SortableContext>
         </DndContext>

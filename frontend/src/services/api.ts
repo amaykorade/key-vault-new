@@ -14,7 +14,8 @@ import type {
   UpdateSecretRequest,
   SecretSearchParams,
   AuditLog,
-  AuditFilters
+  AuditFilters,
+  Folder
 } from '../types';
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
@@ -194,6 +195,38 @@ class ApiService {
 
   async deleteProject(id: string): Promise<void> {
     return this.request<void>(`/projects/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Folder endpoints
+  async getProjectFolders(projectId: string): Promise<{ folders: Folder[] }> {
+    return this.request<{ folders: Folder[] }>(`/projects/${projectId}/folders`);
+  }
+
+  async createFolder(
+    projectId: string,
+    data: { name: string; environment: string; description?: string }
+  ): Promise<{ folder: Folder }> {
+    return this.request<{ folder: Folder }>(`/projects/${projectId}/folders`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateFolder(
+    projectId: string,
+    folderId: string,
+    data: { name?: string; description?: string }
+  ): Promise<{ folder: Folder }> {
+    return this.request<{ folder: Folder }>(`/projects/${projectId}/folders/${folderId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteFolder(projectId: string, folderId: string): Promise<void> {
+    return this.request<void>(`/projects/${projectId}/folders/${folderId}`, {
       method: 'DELETE',
     });
   }

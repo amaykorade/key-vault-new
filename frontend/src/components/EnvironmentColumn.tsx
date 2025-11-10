@@ -3,21 +3,25 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/Card';
 import { Button } from './ui/Button';
-import { FolderSection } from './FolderSection';
 import { Input } from './ui/Input';
-import type { Secret } from '../types';
+import { FolderSection } from './FolderSection';
+import type { Secret, Folder } from '../types';
 
 interface EnvironmentColumnProps {
   id: string;
-  environment: 'development' | 'staging' | 'production';
+  environment: string;
   secrets: Secret[];
+  folders: Folder[];
   onAddSecret: (environment: string, folder?: string) => void;
-  onFolderClick: (environment: string, folder: string) => void;
-  onRenameFolder?: (environment: string, oldFolder: string, newFolder: string) => void;
+  onFolderClick: (environment: string, folderSlug: string) => void;
+  onCreateFolder?: (environment: string, name: string) => Promise<void> | void;
+  onRenameFolder?: (folderId: string, name: string) => Promise<void> | void;
+  onDeleteFolder?: (folderId: string) => Promise<void> | void;
   onRenameEnvironment?: (environment: string) => void;
   canWrite: boolean;
   canDelete: boolean;
   isLoading?: boolean;
+  isLoadingFolders?: boolean;
   label?: string;
   onDeleteEnvironment?: (environment: string) => void;
 }
@@ -57,18 +61,23 @@ export function EnvironmentColumn({
   id,
   environment,
   secrets,
+  folders: projectFolders,
   onAddSecret,
   onFolderClick,
+  onCreateFolder,
   onRenameFolder,
+  onDeleteFolder,
   canWrite,
   canDelete,
   isLoading = false,
+  isLoadingFolders = false,
   label,
   onRenameEnvironment,
   onDeleteEnvironment,
 }: EnvironmentColumnProps) {
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+  const [isSubmittingFolder, setIsSubmittingFolder] = useState(false);
   const [envMenuOpen, setEnvMenuOpen] = useState(false);
 
   const {
@@ -106,16 +115,39 @@ export function EnvironmentColumn({
     return a.localeCompare(b);
   });
 
+  const normalizeSlug = (value: string) =>
+    value?.trim().toLowerCase().replace(/[^a-z0-9-_]+/g, '-').replace(/(^-|-$)/g, '') || 'default';
+
   const displayLabel = label || (environment.charAt(0).toUpperCase() + environment.slice(1));
 
-  const handleCreateFolder = () => {
-    if (!newFolderName.trim()) return;
+  const folderList = useMemo(() => {
+    return projectFolders
+      .map((folder) => ({
+        ...folder,
+        slug: normalizeSlug(folder.slug || folder.name),
+        name: folder.name || folder.slug || 'Default',
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [projectFolders]);
     
-    const folderName = newFolderName.trim().toLowerCase().replace(/\s+/g, '_');
+  const totalSecrets = folderList.reduce((sum, folder) => {
+    const count = folder.secretCount ?? secretsByFolder[folder.slug]?.length ?? 0;
+    return sum + count;
+  }, 0);
+
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim() || !onCreateFolder) return;
+
+    try {
+      setIsSubmittingFolder(true);
+      await Promise.resolve(onCreateFolder(environment, newFolderName.trim()));
     setShowCreateFolder(false);
     setNewFolderName('');
-    // Open add secret form with the new folder preselected
-    onAddSecret(environment, folderName);
+    } catch (error) {
+      console.error('Failed to create folder:', error);
+    } finally {
+      setIsSubmittingFolder(false);
+    }
   };
 
   return (
@@ -140,7 +172,7 @@ export function EnvironmentColumn({
               </div>
               <CardTitle className="text-base font-semibold whitespace-nowrap text-gray-200">{displayLabel}</CardTitle>
               <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-800 text-gray-400 border border-gray-700 flex-shrink-0">
-                {secrets.length}
+                {totalSecrets}
               </span>
             </div>
             {canWrite && (
@@ -180,7 +212,7 @@ export function EnvironmentColumn({
           </div>
         </CardHeader>
         <CardContent className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[400px] max-h-[calc(100vh-350px)]">
-          {isLoading ? (
+          {isLoading || isLoadingFolders ? (
             <div className="space-y-3">
               {[1, 2].map((i) => (
                 <div key={i} className="animate-pulse">
@@ -188,7 +220,7 @@ export function EnvironmentColumn({
                 </div>
               ))}
             </div>
-          ) : folders.length === 0 && !showCreateFolder ? (
+          ) : folderList.length === 0 && !showCreateFolder ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <div className="w-16 h-16 bg-gray-800 rounded-lg flex items-center justify-center mb-3">
                 <svg className="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -234,10 +266,10 @@ export function EnvironmentColumn({
                       variant="gradient"
                       size="sm"
                       onClick={handleCreateFolder}
-                      disabled={!newFolderName.trim()}
+                      disabled={!newFolderName.trim() || isSubmittingFolder}
                       className="flex-1"
                     >
-                      Create
+                      {isSubmittingFolder ? 'Creating...' : 'Create'}
                     </Button>
                     <Button
                       variant="outline"
@@ -254,15 +286,16 @@ export function EnvironmentColumn({
               )}
 
               {/* Folder Sections */}
-              {folders.map((folderName) => (
+              {folderList.map((folder) => (
                 <FolderSection
-                  key={folderName}
-                  folderName={folderName}
-                  secrets={secretsByFolder[folderName]}
+                  key={folder.id}
+                  folder={folder}
+                  secrets={secretsByFolder[folder.slug] || []}
                   environment={environment}
                   onFolderClick={onFolderClick}
                   canWrite={canWrite}
                   onRenameFolder={onRenameFolder}
+                  onDeleteFolder={onDeleteFolder}
                 />
               ))}
 
