@@ -17,6 +17,7 @@ dist/
 build/
 .next/
 out/
+cli/dist/
 
 # IDE files
 .vscode/
