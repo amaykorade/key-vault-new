@@ -141,6 +141,19 @@ Follow the [CLI Guide](./CLI_GUIDE.md) or the in-app docs to authenticate with t
 
 ---
 
+### Release Automation
+
+The CLI publishes automatically via GitHub Actions when you push a tag like `v0.1.1` or trigger the **Publish CLI** workflow manually.
+
+1. Bump the version in `cli/package.json` (`npm version patch|minor|major`).
+2. Push the commit and the git tag (`git push origin main --tags`).
+3. Ensure `NPM_TOKEN` is stored as a repository secret (token must have `publish` scope).
+4. The workflow builds the CLI and runs `npm publish --access public` on your behalf.
+
+You can also launch it manually from the **Actions** tab (workflow: “Publish CLI”), optionally providing the version number for tracking.
+
+---
+
 ## 📦 Tech Stack
 
 ### Backend
