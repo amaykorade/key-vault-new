@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import { CliTokenManager } from '../components/CliTokenManager';
 
 export function ApiPage() {
   const [copiedExample, setCopiedExample] = useState<string | null>(null);
@@ -718,6 +719,193 @@ const config = {
                 <div className="px-3 py-2 bg-gray-800 rounded text-xs text-emerald-400 font-mono">
                   agadg
                 </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* CLI Access Section */}
+      <Card className="hover-lift border-purple-500/30">
+        <CardHeader className="bg-gradient-to-r from-purple-500/10 to-transparent">
+          <div className="flex items-center gap-2">
+            <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <CardTitle className="text-white">CLI Access (Doppler-style)</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
+            <p className="text-sm text-purple-300 leading-relaxed">
+              Use our command-line interface to inject secrets as environment variables into your applications. 
+              Similar to Doppler, our CLI securely fetches secrets and injects them into your process without storing them on disk.
+            </p>
+          </div>
+
+          {/* Installation */}
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-3">Installation</h3>
+            <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
+              <pre className="text-sm text-gray-300 font-mono">
+                <code>{`# Install via npm (recommended)
+npm install -g @keyvault/cli
+
+# Or via Homebrew (macOS)
+brew install keyvault/cli/keyvault
+
+# Or download binary from GitHub releases
+# https://github.com/your-org/keyvault-cli/releases`}</code>
+              </pre>
+              <button
+                onClick={() => copyToClipboard('npm install -g @keyvault/cli', 'install')}
+                className="mt-3 px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors border border-gray-700"
+              >
+                {copiedExample === 'install' ? '✓ Copied' : 'Copy Install Command'}
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Start */}
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-3">Quick Start</h3>
+            <div className="space-y-4">
+              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 bg-purple-500/20 rounded-full flex items-center justify-center text-purple-400 font-bold text-xs">
+                    1
+                  </div>
+                  <h4 className="font-semibold text-white">Create CLI Token</h4>
+                </div>
+                <p className="text-sm text-gray-400 ml-8">
+                  Create a CLI token below. This token authenticates your CLI with the Key Vault API.
+                </p>
+              </div>
+
+              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 bg-purple-500/20 rounded-full flex items-center justify-center text-purple-400 font-bold text-xs">
+                    2
+                  </div>
+                  <h4 className="font-semibold text-white">Login</h4>
+                </div>
+                <div className="ml-8 space-y-2">
+                  <pre className="bg-gray-900 p-3 rounded border border-gray-700 text-sm text-gray-300 font-mono">
+                    <code>keyvault login</code>
+                  </pre>
+                  <p className="text-sm text-gray-400">
+                    Paste your CLI token when prompted. The token is stored securely in <code className="bg-gray-900 px-1 rounded text-xs">~/.config/keyvault/config.yaml</code>
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 bg-purple-500/20 rounded-full flex items-center justify-center text-purple-400 font-bold text-xs">
+                    3
+                  </div>
+                  <h4 className="font-semibold text-white">Setup Project</h4>
+                </div>
+                <div className="ml-8 space-y-2">
+                  <pre className="bg-gray-900 p-3 rounded border border-gray-700 text-sm text-gray-300 font-mono">
+                    <code>keyvault setup</code>
+                  </pre>
+                  <p className="text-sm text-gray-400">
+                    Select your organization, project, environment, and folder. Configuration is saved to <code className="bg-gray-900 px-1 rounded text-xs">.keyvault.yaml</code> in your project directory.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 bg-purple-500/20 rounded-full flex items-center justify-center text-purple-400 font-bold text-xs">
+                    4
+                  </div>
+                  <h4 className="font-semibold text-white">Run Your Application</h4>
+                </div>
+                <div className="ml-8 space-y-2">
+                  <pre className="bg-gray-900 p-3 rounded border border-gray-700 text-sm text-gray-300 font-mono">
+                    <code>keyvault run -- npm start</code>
+                  </pre>
+                  <p className="text-sm text-gray-400">
+                    The CLI fetches all secrets from your configured folder and injects them as environment variables. 
+                    Your application can access them via <code className="bg-gray-900 px-1 rounded text-xs">process.env.SECRET_NAME</code>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* CLI Token Management */}
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-3">Manage CLI Tokens</h3>
+            <CliTokenManager />
+          </div>
+
+          {/* CLI Examples */}
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-3">Usage Examples</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                <h4 className="font-semibold text-white mb-2 text-sm">Node.js Application</h4>
+                <pre className="bg-gray-900 p-3 rounded border border-gray-700 text-xs text-gray-300 font-mono overflow-x-auto">
+                  <code>{`keyvault run -- npm start
+
+# Your app can access:
+process.env.DATABASE_URL
+process.env.API_KEY`}</code>
+                </pre>
+              </div>
+
+              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                <h4 className="font-semibold text-white mb-2 text-sm">Python Application</h4>
+                <pre className="bg-gray-900 p-3 rounded border border-gray-700 text-xs text-gray-300 font-mono overflow-x-auto">
+                  <code>{`keyvault run -- python app.py
+
+# Your app can access:
+import os
+os.environ['DATABASE_URL']
+os.environ['API_KEY']`}</code>
+                </pre>
+              </div>
+
+              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                <h4 className="font-semibold text-white mb-2 text-sm">Docker Container</h4>
+                <pre className="bg-gray-900 p-3 rounded border border-gray-700 text-xs text-gray-300 font-mono overflow-x-auto">
+                  <code>{`keyvault run -- docker run \\
+  -e DATABASE_URL \\
+  -e API_KEY \\
+  my-app:latest`}</code>
+                </pre>
+              </div>
+
+              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                <h4 className="font-semibold text-white mb-2 text-sm">CI/CD Pipeline</h4>
+                <pre className="bg-gray-900 p-3 rounded border border-gray-700 text-xs text-gray-300 font-mono overflow-x-auto">
+                  <code>{`# .github/workflows/deploy.yml
+- name: Run tests
+  run: keyvault run -- npm test`}</code>
+                </pre>
+              </div>
+            </div>
+          </div>
+
+          {/* Security Notes */}
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              <div>
+                <h4 className="text-sm font-semibold text-yellow-400 mb-2">Security Best Practices</h4>
+                <ul className="space-y-1 text-xs text-yellow-200">
+                  <li>• Secrets are injected in memory only - never written to disk</li>
+                  <li>• CLI tokens are user-scoped and inherit your RBAC permissions</li>
+                  <li>• Use separate tokens for different machines/environments</li>
+                  <li>• Rotate CLI tokens regularly (recommended: every 90 days)</li>
+                  <li>• Never commit <code className="bg-gray-900 px-1 rounded">.keyvault.yaml</code> or tokens to version control</li>
+                  <li>• Revoke unused tokens immediately</li>
+                </ul>
               </div>
             </div>
           </div>

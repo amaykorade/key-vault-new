@@ -538,6 +538,24 @@ class ApiService {
     return this.request<{ logs: AuditLog[] }>(`/audit/folder/${projectId}/${encodeURIComponent(environment)}/${encodeURIComponent(folder)}?limit=${limit}&offset=${offset}`);
   }
 
+  // CLI token methods
+  async createCliToken(name?: string): Promise<{ token: string; tokenMeta: any }> {
+    return this.request<{ token: string; tokenMeta: any }>('/cli/token', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+  }
+
+  async listCliTokens(): Promise<{ tokens: any[] }> {
+    return this.request<{ tokens: any[] }>('/cli/tokens');
+  }
+
+  async deleteCliToken(tokenId: string): Promise<void> {
+    return this.request<void>(`/cli/token/${tokenId}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Utility methods
   isAuthenticated(): boolean {
     return !!this.accessToken;
