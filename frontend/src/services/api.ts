@@ -58,9 +58,21 @@ class ApiService {
     this.accessToken = localStorage.getItem('accessToken');
   }
 
+  // Public method to reload token (useful after OAuth callback)
+  reloadToken() {
+    this.accessToken = localStorage.getItem('accessToken');
+  }
+
   private setToken(token: string) {
     this.accessToken = token;
     localStorage.setItem('accessToken', token);
+  }
+
+  applyTokens(accessToken: string, refreshToken?: string) {
+    this.setToken(accessToken);
+    if (refreshToken) {
+      localStorage.setItem('refreshToken', refreshToken);
+    }
   }
 
   private clearToken() {
@@ -131,13 +143,6 @@ class ApiService {
     return response;
   }
 
-  // Allow applying tokens from OAuth callback
-  applyTokens(accessToken: string, refreshToken?: string) {
-    this.setToken(accessToken);
-    if (refreshToken) {
-      localStorage.setItem('refreshToken', refreshToken);
-    }
-  }
 
   async logout() {
     this.clearToken();
@@ -553,6 +558,13 @@ class ApiService {
   async deleteCliToken(tokenId: string): Promise<void> {
     return this.request<void>(`/cli/token/${tokenId}`, {
       method: 'DELETE',
+    });
+  }
+
+  async authorizeCliDeviceCode(userCode: string, name?: string): Promise<{ success: boolean; message: string; token?: string }> {
+    return this.request<{ success: boolean; message: string; token?: string }>(`/cli/device-code/${userCode}/authorize`, {
+      method: 'POST',
+      body: JSON.stringify({ name }),
     });
   }
 

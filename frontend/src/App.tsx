@@ -16,6 +16,8 @@ import { ApiPage } from './pages/ApiPage';
 import { ROUTES } from './constants';
 import { FolderPage } from './pages/FolderPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
+import { CliAuthPage } from './pages/CliAuthPage';
+import { CliGuidePage } from './pages/CliGuidePage';
 import { AppLayout } from './components/layout/AppLayout';
 
 function App() {
@@ -109,6 +111,17 @@ function App() {
           />
 
           <Route
+            path={ROUTES.CLI_GUIDE}
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <CliGuidePage />
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/projects/:id"
             element={
               <ProtectedRoute>
@@ -146,6 +159,9 @@ function App() {
 
           {/* OAuth callback */}
           <Route path={"/auth/callback"} element={<AuthCallbackPage />} />
+
+          {/* CLI authorization */}
+          <Route path="/cli/auth" element={<CliAuthPage />} />
 
           {/* Default redirect */}
           <Route path="/" element={<LoginPage />} />

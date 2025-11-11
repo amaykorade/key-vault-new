@@ -1,8 +1,11 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { CliTokenManager } from '../components/CliTokenManager';
+import { ROUTES } from '../constants';
 
 export function ApiPage() {
+  const navigate = useNavigate();
   const [copiedExample, setCopiedExample] = useState<string | null>(null);
   const [activeLanguage, setActiveLanguage] = useState<'curl' | 'node' | 'python' | 'go'>('curl');
 
@@ -728,11 +731,19 @@ const config = {
       {/* CLI Access Section */}
       <Card className="hover-lift border-purple-500/30">
         <CardHeader className="bg-gradient-to-r from-purple-500/10 to-transparent">
-          <div className="flex items-center gap-2">
-            <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <CardTitle className="text-white">CLI Access (Doppler-style)</CardTitle>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <CardTitle className="text-white">CLI Access (Doppler-style)</CardTitle>
+            </div>
+            <button
+              onClick={() => navigate(ROUTES.CLI_GUIDE)}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg border border-purple-500/40 text-purple-200 bg-purple-500/10 hover:bg-purple-500/20 transition-colors"
+            >
+              View Full CLI Guide
+            </button>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -775,11 +786,22 @@ brew install keyvault/cli/keyvault
                   <div className="w-6 h-6 bg-purple-500/20 rounded-full flex items-center justify-center text-purple-400 font-bold text-xs">
                     1
                   </div>
-                  <h4 className="font-semibold text-white">Create CLI Token</h4>
+                  <h4 className="font-semibold text-white">Install the CLI</h4>
                 </div>
-                <p className="text-sm text-gray-400 ml-8">
-                  Create a CLI token below. This token authenticates your CLI with the Key Vault API.
-                </p>
+                <div className="ml-8 space-y-2">
+                  <pre className="bg-gray-900 p-3 rounded border border-gray-700 text-sm text-gray-300 font-mono">
+                    <code>npm install -g @keyvault/cli</code>
+                  </pre>
+                  <button
+                    onClick={() => copyToClipboard('npm install -g @keyvault/cli', 'cli-install')}
+                    className="px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors border border-gray-700"
+                  >
+                    {copiedExample === 'cli-install' ? '✓ Copied' : 'Copy command'}
+                  </button>
+                  <p className="text-sm text-gray-400">
+                    Prefer Homebrew, tarballs, or Docker? See the full guide for upcoming alternative installers.
+                  </p>
+                </div>
               </div>
 
               <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
@@ -787,14 +809,14 @@ brew install keyvault/cli/keyvault
                   <div className="w-6 h-6 bg-purple-500/20 rounded-full flex items-center justify-center text-purple-400 font-bold text-xs">
                     2
                   </div>
-                  <h4 className="font-semibold text-white">Login</h4>
+                  <h4 className="font-semibold text-white">Authenticate via Browser</h4>
                 </div>
                 <div className="ml-8 space-y-2">
                   <pre className="bg-gray-900 p-3 rounded border border-gray-700 text-sm text-gray-300 font-mono">
                     <code>keyvault login</code>
                   </pre>
                   <p className="text-sm text-gray-400">
-                    Paste your CLI token when prompted. The token is stored securely in <code className="bg-gray-900 px-1 rounded text-xs">~/.config/keyvault/config.yaml</code>
+                    A browser window opens to <code className="bg-gray-900 px-1 rounded text-xs">/cli/auth</code>. Sign in, click <strong>Give Access</strong>, and the CLI stores your token securely on this device.
                   </p>
                 </div>
               </div>
@@ -804,14 +826,14 @@ brew install keyvault/cli/keyvault
                   <div className="w-6 h-6 bg-purple-500/20 rounded-full flex items-center justify-center text-purple-400 font-bold text-xs">
                     3
                   </div>
-                  <h4 className="font-semibold text-white">Setup Project</h4>
+                  <h4 className="font-semibold text-white">Choose Defaults</h4>
                 </div>
                 <div className="ml-8 space-y-2">
                   <pre className="bg-gray-900 p-3 rounded border border-gray-700 text-sm text-gray-300 font-mono">
                     <code>keyvault setup</code>
                   </pre>
                   <p className="text-sm text-gray-400">
-                    Select your organization, project, environment, and folder. Configuration is saved to <code className="bg-gray-900 px-1 rounded text-xs">.keyvault.yaml</code> in your project directory.
+                    Select your organization, project, environment, and folder once per repo. We save them to <code className="bg-gray-900 px-1 rounded text-xs">.keyvault.yaml</code> (never commit this file).
                   </p>
                 </div>
               </div>
@@ -828,8 +850,7 @@ brew install keyvault/cli/keyvault
                     <code>keyvault run -- npm start</code>
                   </pre>
                   <p className="text-sm text-gray-400">
-                    The CLI fetches all secrets from your configured folder and injects them as environment variables. 
-                    Your application can access them via <code className="bg-gray-900 px-1 rounded text-xs">process.env.SECRET_NAME</code>
+                    Secrets are injected as environment variables at runtime (e.g., <code className="bg-gray-900 px-1 rounded text-xs">process.env.SECRET_NAME</code>, <code className="bg-gray-900 px-1 rounded text-xs">os.environ['SECRET_NAME']</code>).
                   </p>
                 </div>
               </div>
@@ -839,6 +860,9 @@ brew install keyvault/cli/keyvault
           {/* CLI Token Management */}
           <div>
             <h3 className="text-lg font-semibold text-white mb-3">Manage CLI Tokens</h3>
+            <p className="text-sm text-gray-400 mb-3">
+              Every browser authorization creates a scoped CLI token. Use the manager below to revoke old devices, rename tokens, or generate manual tokens for automation.
+            </p>
             <CliTokenManager />
           </div>
 

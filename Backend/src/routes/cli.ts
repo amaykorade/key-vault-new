@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { requireCliAuth, CliAuthRequest } from '../middleware/cli-auth';
 import { CliTokenService } from '../services/cli-token';
+import { CliDeviceCodeService } from '../services/cli-device-code';
 import { db } from '../lib/db';
 import { AccessControlService } from '../services/access-control';
 import { decryptSecret } from '../lib/encryption';
@@ -55,6 +56,63 @@ router.delete('/cli/token/:id', requireAuth, async (req: AuthRequest, res) => {
     req.ip || req.connection?.remoteAddress
   ).catch(console.error);
   res.status(204).send();
+});
+
+// Device code flow for CLI OAuth
+router.post('/cli/device-code', async (_req, res) => {
+  try {
+    const deviceCodeInfo = await CliDeviceCodeService.generateDeviceCode();
+    res.json(deviceCodeInfo);
+  } catch (error) {
+    console.error('[cli] device code generation error', error);
+    res.status(500).json({ error: 'Failed to generate device code' });
+  }
+});
+
+router.get('/cli/device-code/:deviceCode', async (req, res) => {
+  try {
+    const { deviceCode } = req.params;
+    const status = await CliDeviceCodeService.getDeviceCodeStatus(deviceCode);
+
+    if (status.status === 'approved' && status.token) {
+      return res.json(status);
+    }
+
+    res.json(status);
+  } catch (error) {
+    console.error('[cli] device code status error', error);
+    res.status(500).json({ error: 'Failed to check device code status' });
+  }
+});
+
+router.post('/cli/device-code/:userCode/authorize', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { userCode } = req.params;
+    const { name } = req.body || {};
+
+    const result = await CliDeviceCodeService.authorizeDeviceCode(userCode, req.user!.id, name);
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    // Get the device code to fetch the token
+    const deviceCodeRecord = await db.cliDeviceCode.findUnique({
+      where: { userCode },
+    });
+
+    if (!deviceCodeRecord) {
+      return res.status(404).json({ error: 'Device code not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Device authorized successfully. You can return to the CLI.',
+    });
+  } catch (error) {
+    console.error('[cli] device code authorization error', error);
+    res.status(500).json({ error: 'Failed to authorize device code' });
+  }
 });
 
 router.get('/cli/profile', requireCliAuth, async (req: CliAuthRequest, res) => {

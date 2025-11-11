@@ -12,12 +12,23 @@ export function AuthCallbackPage() {
   useEffect(() => {
     const accessToken = params.get('access_token');
     const refreshToken = params.get('refresh_token') || undefined;
+    const redirectUrl = params.get('redirect') || sessionStorage.getItem('cliAuthRedirect');
 
     if (accessToken) {
       apiService.applyTokens(accessToken, refreshToken);
+      // Clear the stored redirect if it was from sessionStorage
+      if (sessionStorage.getItem('cliAuthRedirect')) {
+        sessionStorage.removeItem('cliAuthRedirect');
+      }
+      
       // Fetch current user and redirect
       setUserAfterToken().finally(() => {
-        navigate(ROUTES.PROJECTS, { replace: true });
+        // If there's a redirect URL, use it; otherwise go to projects
+        if (redirectUrl) {
+          window.location.href = redirectUrl;
+        } else {
+          navigate(ROUTES.PROJECTS, { replace: true });
+        }
       });
     } else {
       navigate(ROUTES.LOGIN, { replace: true });

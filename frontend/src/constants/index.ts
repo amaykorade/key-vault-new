@@ -106,6 +106,8 @@ export const ROUTES = {
   API_TOKENS: '/api/tokens',
   AUDIT: '/audit',
   SETTINGS: '/settings',
+  CLI_AUTH: '/cli/auth',
+  CLI_GUIDE: '/docs/cli',
 } as const;
 
 // UI constants

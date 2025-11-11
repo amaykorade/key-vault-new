@@ -426,15 +426,33 @@ model FolderVercelSync {
 }
 
 model CliToken {
-  id          String   @id @default(uuid())
-  tokenHash   String   @unique
+  id          String           @id @default(uuid())
+  tokenHash   String           @unique
   userId      String
   name        String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime         @default(now())
   lastUsedAt  DateTime?
   expiresAt   DateTime?
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceCodes CliDeviceCode[]
 
+  @@index([userId])
+}
+
+model CliDeviceCode {
+  id          String   @id @default(uuid())
+  deviceCode  String   @unique
+  userCode    String   @unique
+  userId      String?
+  cliTokenId  String?
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  verifiedAt  DateTime?
+
+  cliToken    CliToken? @relation(fields: [cliTokenId], references: [id], onDelete: SetNull)
+
+  @@index([deviceCode])
+  @@index([userCode])
   @@index([userId])
 }

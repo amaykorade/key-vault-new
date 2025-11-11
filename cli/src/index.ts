@@ -21,49 +21,143 @@ program
 program
   .command('login')
   .description('Authenticate the CLI with your Key Vault account')
-  .option('-t, --token <token>', 'Provide a CLI token directly')
+  .option('-t, --token <token>', 'Provide a CLI token directly (legacy: manual token entry)')
   .option('-n, --name <name>', 'Friendly name for this device (stored with the token)')
   .action(async (options) => {
     const config = await loadConfig();
     let token = options.token as string | undefined;
 
-    if (!token) {
-      console.log(chalk.cyan('Opening the Key Vault dashboard to generate a CLI token...\n'));
-      const dashboardUrl = 'https://key-vault-new.vercel.app/cli';
-      try {
-        await open(dashboardUrl, { wait: false });
-      } catch {
-        console.log(chalk.yellow('Unable to automatically open the browser. Please visit:\n'));
-        console.log(chalk.green(dashboardUrl));
+    // Legacy manual token flow
+    if (token) {
+      if (!token.startsWith('kv_cli_')) {
+        console.error(chalk.red('Invalid token format. Token must start with kv_cli_'));
+        process.exitCode = 1;
+        return;
       }
 
-      const response = await prompts({
-        type: 'password',
-        name: 'token',
-        message: 'Paste the CLI token here',
-        validate: (value: string) => (value && value.startsWith('kv_cli_') ? true : 'Token must start with kv_cli_'),
-      });
+      const updatedConfig: ConfigFile = {
+        ...config,
+        auth: {
+          token,
+          name: options.name || config.auth?.name,
+          lastLogin: new Date().toISOString(),
+        },
+      };
 
-      token = response.token;
-    }
-
-    if (!token) {
-      console.error(chalk.red('No token provided. Login aborted.'));
-      process.exitCode = 1;
+      await saveConfig(updatedConfig);
+      console.log(chalk.green('✓ Token saved. CLI is authenticated.'));
       return;
     }
 
-    const updatedConfig: ConfigFile = {
-      ...config,
-      auth: {
-        token,
-        name: options.name || config.auth?.name,
-        lastLogin: new Date().toISOString(),
-      },
-    };
+    // Browser-based OAuth flow
+    console.log(chalk.cyan('\n🔐 Starting CLI authentication...\n'));
 
-    await saveConfig(updatedConfig);
-    console.log(chalk.green('✓ Token saved. CLI is authenticated.'));
+    try {
+      // Generate device code
+      const { apiPost } = await import('./lib/api.js');
+      const deviceCodeInfo = await apiPost('/cli/device-code');
+
+      const { deviceCode, userCode, verificationUrl, expiresIn, interval } = deviceCodeInfo;
+
+      console.log(chalk.bold('Step 1: Open this URL in your browser:'));
+      console.log(chalk.cyan(verificationUrl));
+      console.log(chalk.gray(`\nOr enter this code manually: ${chalk.bold(userCode)}\n`));
+
+      // Open browser
+      try {
+        await open(verificationUrl, { wait: false });
+        console.log(chalk.green('✓ Browser opened. Waiting for authorization...\n'));
+      } catch {
+        console.log(chalk.yellow('⚠ Unable to automatically open the browser.'));
+        console.log(chalk.yellow('Please visit the URL above to authorize the CLI.\n'));
+      }
+
+      // Poll for token
+      const spinner = ora('Waiting for authorization...').start();
+      const startTime = Date.now();
+      const expiryTime = startTime + expiresIn * 1000;
+      let pollCount = 0;
+      const maxPolls = Math.ceil(expiresIn / interval);
+
+      while (Date.now() < expiryTime && pollCount < maxPolls) {
+        // Wait before polling (except first time)
+        if (pollCount > 0) {
+          await new Promise((resolve) => setTimeout(resolve, interval * 1000));
+        }
+        pollCount++;
+
+        try {
+          const status = await apiGet(`/cli/device-code/${deviceCode}`);
+
+          if (status.status === 'approved' && status.token) {
+            spinner.stop();
+            console.log(chalk.green('\n✓ Authorization successful!\n'));
+
+            // Save token
+            const updatedConfig: ConfigFile = {
+              ...config,
+              auth: {
+                token: status.token,
+                name: options.name || config.auth?.name || `CLI ${new Date().toLocaleDateString()}`,
+                lastLogin: new Date().toISOString(),
+              },
+            };
+
+            await saveConfig(updatedConfig);
+            console.log(chalk.green('✓ Token saved. CLI is authenticated.'));
+            return;
+          } else if (status.status === 'expired') {
+            spinner.stop();
+            const errorMsg = status.error || 'Authorization expired';
+            console.error(chalk.red(`\n✗ ${errorMsg}`));
+            if (errorMsg.includes('not found')) {
+              console.error(chalk.yellow('  Tip: Make sure the backend is running and the device code was created successfully.'));
+              console.error(chalk.yellow('  Try running: curl http://localhost:4000/health'));
+            } else if (errorMsg.includes('already retrieved')) {
+              console.error(chalk.yellow('  The token was already retrieved. Please run `keyvault login` again.'));
+            } else if (errorMsg.includes('expired')) {
+              console.error(chalk.yellow('  Device codes expire after 10 minutes. Please run `keyvault login` again.'));
+            }
+            process.exitCode = 1;
+            return;
+          } else if (status.status === 'pending') {
+            // Update spinner text to show we're still waiting
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const remaining = Math.max(0, expiresIn - elapsed);
+            spinner.text = `Waiting for authorization... (${remaining}s remaining)`;
+            // Continue polling
+            continue;
+          }
+        } catch (error: any) {
+          // For network errors, continue polling (might be transient)
+          if (error instanceof ApiError) {
+            if (error.status === 404) {
+              // 404 might mean device code not found, but continue polling in case it's a timing issue
+              continue;
+            } else if (error.status >= 500) {
+              // Server errors, continue polling
+              continue;
+            } else {
+              // Other errors, stop polling
+              spinner.stop();
+              console.error(chalk.red(`\n✗ Error: ${error.message}`));
+              process.exitCode = 1;
+              return;
+            }
+          } else {
+            // Network or other errors, continue polling
+            continue;
+          }
+        }
+      }
+
+      spinner.stop();
+      console.error(chalk.red('\n✗ Authorization timed out. Please try again.'));
+      process.exitCode = 1;
+    } catch (error) {
+      console.error(chalk.red(`\n✗ Login failed: ${error instanceof Error ? error.message : 'Unknown error'}`));
+      process.exitCode = 1;
+    }
   });
 
 program

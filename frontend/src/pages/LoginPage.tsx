@@ -25,7 +25,10 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = location.state?.from?.pathname || ROUTES.PROJECTS;
+  // Get redirect from URL params or state
+  const searchParams = new URLSearchParams(location.search);
+  const redirectUrl = searchParams.get('redirect');
+  const from = redirectUrl || location.state?.from?.pathname || ROUTES.PROJECTS;
 
   const {
     register,
@@ -41,7 +44,12 @@ export function LoginPage() {
     
     try {
       await login(data);
-      navigate(from, { replace: true });
+      // If redirect is a full URL, use window.location, otherwise use navigate
+      if (redirectUrl && (redirectUrl.startsWith('http://') || redirectUrl.startsWith('https://'))) {
+        window.location.href = redirectUrl;
+      } else {
+        navigate(from, { replace: true });
+      }
     } catch (err) {
       // Error is handled by the auth store
     } finally {
@@ -50,7 +58,10 @@ export function LoginPage() {
   };
 
   const onGoogleLogin = () => {
-    window.location.href = `${API_BASE_URL.replace(/\/$/, '')}/auth/google`;
+    const baseUrl = API_BASE_URL.replace(/\/$/, '');
+    // Preserve redirect parameter for Google OAuth
+    const redirectParam = redirectUrl ? `?redirect=${encodeURIComponent(redirectUrl)}` : '';
+    window.location.href = `${baseUrl}/auth/google${redirectParam}`;
   };
 
   return (

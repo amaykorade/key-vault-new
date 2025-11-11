@@ -245,11 +245,11 @@ const environmentLabel = useMemo(() => {
 }, [env]);
 
 const folderLabel = useMemo(() => {
-  const folderName = folder || 'default';
+    const folderName = folder || 'default';
   return folderName
-    .split(/[-_]/)
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ');
+      .split(/[-_]/)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
 }, [folder]);
 
 const breadcrumbItems = useMemo(() => {
@@ -489,7 +489,7 @@ const breadcrumbItems = useMemo(() => {
                   {projectDetails.organization.name}
                 </span>
               )}
-            </div>
+        </div>
           </div>
         </div>
         {/* Right side intentionally left empty for future actions */}

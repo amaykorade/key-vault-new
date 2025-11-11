@@ -48,6 +48,13 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
     next();
   } catch (error) {
     console.error('Auth middleware error:', error);
-    res.status(401).json({ error: 'Invalid token' });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const authHeader = req.headers.authorization;
+    console.error('Auth error details:', {
+      error: errorMessage,
+      hasAuthHeader: !!authHeader,
+      authHeaderPrefix: authHeader?.substring(0, 20) || 'none',
+    });
+    res.status(401).json({ error: 'Invalid token', details: errorMessage });
   }
 }

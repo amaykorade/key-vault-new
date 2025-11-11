@@ -30,7 +30,8 @@ router.get('/google/callback',
       // Generate JWT tokens
       const { accessToken, refreshToken } = generateTokens(user.id);
 
-      // Redirect to frontend with tokens (you can customize this URL)
+      // Redirect to frontend callback
+      // The frontend will check sessionStorage for cliAuthRedirect
       const frontendUrl = process.env.CORS_ORIGIN || 'http://localhost:5173';
       res.redirect(`${frontendUrl}/auth/callback?access_token=${accessToken}&refresh_token=${refreshToken}`);
     } catch (error) {
