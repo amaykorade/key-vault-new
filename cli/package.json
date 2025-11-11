@@ -1,6 +1,6 @@
 {
   "name": "@keyvault/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Key Vault CLI for managing secrets from the terminal",
   "bin": {
     "keyvault": "dist/index.cjs"
@@ -34,4 +34,3 @@
     "typescript": "^5.6.3"
   }
 }
-

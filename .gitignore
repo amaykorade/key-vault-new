@@ -18,6 +18,7 @@ build/
 .next/
 out/
 cli/dist/
+.npmrc
 
 # IDE files
 .vscode/

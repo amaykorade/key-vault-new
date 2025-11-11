@@ -126,6 +126,21 @@ http://localhost:5173
 
 ---
 
+### Install the CLI (Optional)
+
+Once you have backend access, install the global CLI published to npm:
+
+```bash
+npm install -g @keyvault/cli
+
+# Verify
+keyvault --version
+```
+
+Follow the [CLI Guide](./CLI_GUIDE.md) or the in-app docs to authenticate with the device-code flow and inject secrets into any command.
+
+---
+
 ## 📦 Tech Stack
 
 ### Backend
@@ -156,11 +171,10 @@ http://localhost:5173
 
 ## 📖 Documentation
 
-- **[Quick Deploy Guide](./QUICK_DEPLOY.md)** - Deploy in 15 minutes
-- **[Full Deployment Guide](./DEPLOYMENT_GUIDE.md)** - Comprehensive deployment instructions
-- **[Environment Setup](./ENVIRONMENT_SETUP.md)** - Configure for different environments
-- **[Backend Environment](./Backend/ENV_SETUP.md)** - Backend-specific configuration
-- **[Frontend Environment](./frontend/ENV_SETUP.md)** - Frontend-specific configuration
+- **[CLI Guide](./CLI_GUIDE.md)** – Install, authenticate, and run the published CLI (`@keyvault/cli`)
+- **[Backend Environment Setup](./Backend/ENV_SETUP.md)** – Backend variables & local configuration
+- **[Frontend Environment Setup](./frontend/ENV_SETUP.md)** – Frontend variables & local configuration
+- **API Docs in-app** – Visit the **Docs → API** tab for REST and CLI walkthroughs
 
 ---
 
@@ -379,7 +393,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ ] Google Cloud Secret Manager integration
 - [ ] Secret versioning and rollback
 - [ ] Secret templates
-- [ ] CLI tool for secret management
+- [x] CLI tool for secret management
 - [ ] Terraform provider
 - [ ] Kubernetes operator
 - [ ] Secret rotation policies
