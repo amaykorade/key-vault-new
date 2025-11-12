@@ -568,6 +568,13 @@ class ApiService {
     });
   }
 
+  async submitEarlyAccess(data: { email: string; name?: string; developerType: string }): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>('/public/early-access', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   // Utility methods
   isAuthenticated(): boolean {
     return !!this.accessToken;

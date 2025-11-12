@@ -456,3 +456,11 @@ model CliDeviceCode {
   @@index([userCode])
   @@index([userId])
 }
+
+model EarlyAccessSignup {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  name          String?
+  developerType String
+  createdAt     DateTime @default(now())
+}

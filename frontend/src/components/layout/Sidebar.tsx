@@ -1,4 +1,4 @@
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { ROUTES } from '../../constants';
 // import { useLayoutStore } from '../../stores/layout';
@@ -131,7 +131,7 @@ export function Sidebar() {
     <aside className={`hidden lg:block w-64 flex-none bg-gray-900/50 backdrop-blur-sm h-screen sticky top-0 border-r border-gray-800 flex flex-col overflow-y-auto`}>
       {/* Brand/Logo Section */}
       <div className="p-4 border-b border-gray-800">
-        <div className="flex items-center space-x-3">
+        <Link to={ROUTES.LANDING} className="flex items-center space-x-3 transition hover:opacity-90">
           <div className="w-8 h-8 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-lg flex items-center justify-center">
             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
@@ -141,7 +141,7 @@ export function Sidebar() {
             <h1 className="text-lg font-bold text-white">Key Vault</h1>
             <p className="text-xs text-gray-400">Secure Secrets</p>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Workspace Switcher */}
@@ -245,6 +245,9 @@ export function Sidebar() {
               />
             )}
           </div>
+
+          <div className="my-3 border-t border-gray-800" />
+
           <SidebarLink
             to={ROUTES.API}
             collapsed={collapsed}
@@ -252,6 +255,17 @@ export function Sidebar() {
             icon={
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            }
+          />
+          <SidebarLink
+            to={ROUTES.BILLING}
+            collapsed={collapsed}
+            label="Billing"
+            icon={
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5h16a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V7a2 2 0 012-2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11h2m-6 0h.01m-4 0h.01" />
               </svg>
             }
           />

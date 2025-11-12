@@ -18,6 +18,8 @@ import { FolderPage } from './pages/FolderPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { CliAuthPage } from './pages/CliAuthPage';
 import { CliGuidePage } from './pages/CliGuidePage';
+import { BillingPage } from './pages/BillingPage';
+import { LandingPage } from './pages/LandingPage';
 import { AppLayout } from './components/layout/AppLayout';
 
 function App() {
@@ -42,6 +44,8 @@ function App() {
               </PublicRoute>
             }
           />
+
+          <Route path={ROUTES.LANDING} element={<LandingPage />} />
 
           {/* Protected routes */}
           <Route
@@ -105,6 +109,17 @@ function App() {
               <ProtectedRoute>
                 <AppLayout>
                   <ApiPage />
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path={ROUTES.BILLING}
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <BillingPage />
                 </AppLayout>
               </ProtectedRoute>
             }

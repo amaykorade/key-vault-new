@@ -18,6 +18,7 @@ import vercelRoutes from './routes/vercel';
 import { requireAuth, AuthRequest } from './middleware/auth';
 import cliRoutes from './routes/cli';
 import folderRoutes from './routes/folders';
+import publicRoutes from './routes/public';
 
 const app = express();
 
@@ -105,6 +106,7 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/v1', publicSecretsRoutes);
 app.use('/api', apiKeysRoutes);
 app.use('/api', tokensRoutes);
+app.use('/api/public', publicRoutes);
 
 // Vercel integration routes
 app.use('/api/vercel', vercelRoutes);

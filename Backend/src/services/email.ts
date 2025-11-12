@@ -330,6 +330,124 @@ ${frontendUrl}
     });
   }
 
+  static async sendEarlyAccessConfirmation(email: string, name?: string | null, developerType?: string): Promise<void> {
+    const frontendUrl = env.FRONTEND_URL || 'http://localhost:5173';
+    const displayName = name?.trim() ? name.trim() : 'there';
+
+    const html = `
+      <!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <title>Thanks for joining APIVault Early Access</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+              background: #0f172a;
+              color: #e2e8f0;
+              padding: 32px;
+            }
+            .container {
+              max-width: 560px;
+              margin: 0 auto;
+              background: #111827;
+              border-radius: 16px;
+              border: 1px solid #1f2937;
+              padding: 32px;
+              box-shadow: 0 20px 40px rgba(15, 23, 42, 0.35);
+            }
+            .logo {
+              width: 52px;
+              height: 52px;
+              border-radius: 14px;
+              background: linear-gradient(135deg, #10b981 0%, #14b8a6 100%);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              margin-bottom: 24px;
+            }
+            h1 {
+              margin: 0 0 12px 0;
+              font-size: 24px;
+              color: #ecfeff;
+            }
+            p {
+              line-height: 1.6;
+              margin: 16px 0;
+            }
+            .badge {
+              display: inline-flex;
+              padding: 6px 10px;
+              border-radius: 9999px;
+              background: rgba(16, 185, 129, 0.12);
+              color: #34d399;
+              font-size: 12px;
+              letter-spacing: 0.08em;
+              font-weight: 600;
+              text-transform: uppercase;
+            }
+            .footer {
+              margin-top: 32px;
+              font-size: 12px;
+              color: #94a3b8;
+              border-top: 1px solid #1f2937;
+              padding-top: 16px;
+            }
+            a.button {
+              display: inline-block;
+              margin-top: 24px;
+              padding: 12px 24px;
+              border-radius: 8px;
+              background: linear-gradient(135deg, #10b981 0%, #0ea5e9 100%);
+              color: white;
+              font-weight: 600;
+              text-decoration: none;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="logo">
+              <svg width="26" height="26" fill="none" stroke="white" stroke-width="1.8" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
+            </div>
+            <div class="badge">Early Access</div>
+            <h1>Thanks for joining, ${displayName}!</h1>
+            <p>
+              We're excited to have you in the APIVault private beta. We're polishing the experience for developers like you${developerType ? ` (${developerType})` : ''}, and you'll be one of the first to know when the platform opens up.
+            </p>
+            <p>
+              Expect a personal note from us soon with roadmap updates, sneak peeks, and a heads-up when your seat is ready. In the meantime, feel free to reply to this email with anything you'd love APIVault to support.
+            </p>
+            <a class="button" href="${frontendUrl}">Learn more</a>
+            <div class="footer">
+              Built by indie hackers who hate leaked API keys as much as you do.<br />
+              We'll never share your email. Opt out anytime.
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const text = `Thanks for joining APIVault early access, ${displayName}!
+
+We're excited to have you in the private beta. We'll reach out soon with updates and let you know as soon as your spot is ready.
+
+Best,
+The APIVault Team
+${frontendUrl}
+`;
+
+    await this.sendEmail({
+      to: email,
+      subject: 'You’re on the APIVault early access list 🚀',
+      html,
+      text,
+    });
+  }
+
   // Send welcome email after invitation acceptance
   static async sendWelcomeEmail(
     email: string, 
