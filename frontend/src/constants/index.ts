@@ -109,7 +109,7 @@ export const ROUTES = {
   CLI_AUTH: '/cli/auth',
   CLI_GUIDE: '/docs/cli',
   BILLING: '/billing',
-  LANDING: '/landing',
+  LANDING: '/',
 } as const;
 
 // UI constants

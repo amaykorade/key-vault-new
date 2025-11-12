@@ -179,7 +179,7 @@ function App() {
           <Route path="/cli/auth" element={<CliAuthPage />} />
 
           {/* Default redirect */}
-          <Route path="/" element={<LoginPage />} />
+          <Route path="*" element={<LoginPage />} />
         </Routes>
 
         {/* Toast notifications */}
