@@ -6,6 +6,7 @@ import prompts from 'prompts';
 import ora from 'ora';
 import open from 'open';
 import { loadConfig, saveConfig, loadProjectConfig, saveProjectConfig, ConfigFile, ProjectConfig } from './lib/config.js';
+import packageJson from '../package.json';
 import { apiGet, ApiError, apiBaseUrl } from './lib/api.js';
 import { ensureAuthToken, ensureSetupConfig } from './lib/helpers.js';
 import { spawn } from 'node:child_process';
@@ -16,7 +17,7 @@ const program = new Command();
 program
   .name('keyvault')
   .description('Key Vault CLI')
-  .version('0.1.0');
+  .version(packageJson.version);
 
 program
   .command('login')
