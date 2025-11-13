@@ -13,13 +13,16 @@ const earlyAccessSchema = z.object({
 
 router.post('/early-access', async (req, res) => {
   try {
+    console.log('[public] Early access signup request received:', { body: req.body });
     const payload = earlyAccessSchema.parse(req.body);
+    console.log('[public] Validated payload:', { email: payload.email, developerType: payload.developerType });
 
     const existing = await db.earlyAccessSignup.findFirst({
       where: { email: payload.email },
     });
 
     if (existing) {
+      console.log('[public] Updating existing signup:', existing.id);
       await db.earlyAccessSignup.update({
         where: { id: existing.id },
         data: {
@@ -28,6 +31,7 @@ router.post('/early-access', async (req, res) => {
         },
       });
     } else {
+      console.log('[public] Creating new signup');
       await db.earlyAccessSignup.create({
         data: {
           email: payload.email,
@@ -38,18 +42,22 @@ router.post('/early-access', async (req, res) => {
     }
 
     try {
+      console.log('[public] Sending confirmation email to:', payload.email);
       await EmailService.sendEarlyAccessConfirmation(
         payload.email,
         payload.name,
         payload.developerType
       );
+      console.log('[public] Confirmation email sent successfully');
     } catch (emailError) {
       console.error('[public] early access email error:', emailError instanceof Error ? emailError.message : emailError);
     }
 
+    console.log('[public] Early access signup completed successfully');
     res.json({ success: true });
   } catch (error) {
     if (error instanceof z.ZodError) {
+      console.error('[public] Validation error:', error.flatten());
       return res.status(400).json({ success: false, error: 'Invalid data', details: error.flatten() });
     }
 

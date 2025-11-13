@@ -569,10 +569,50 @@ class ApiService {
   }
 
   async submitEarlyAccess(data: { email: string; name?: string; developerType: string }): Promise<{ success: boolean }> {
-    return this.request<{ success: boolean }>('/public/early-access', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    const url = `${this.baseURL}/public/early-access`;
+    
+    try {
+      console.log('[API] Submitting early access:', { url, data: { email: data.email, developerType: data.developerType } });
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      console.log('[API] Response status:', response.status, response.statusText);
+
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
+        }
+        console.error('[API] Early access error response:', errorData);
+        throw new ApiError(
+          errorData.error || `HTTP ${response.status}`,
+          response.status,
+          errorData.details
+        );
+      }
+
+      const result = await response.json();
+      console.log('[API] Early access success:', result);
+      return result;
+    } catch (error) {
+      console.error('[API] Early access fetch error:', error);
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      // Re-throw network errors as ApiError with status 0
+      throw new ApiError(
+        error instanceof Error ? error.message : 'Network error',
+        0
+      );
+    }
   }
 
   // Utility methods

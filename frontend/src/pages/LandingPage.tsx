@@ -79,7 +79,8 @@ export function LandingPage() {
     event.preventDefault();
     if (formState === 'submitting') return;
 
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     const email = (formData.get('email') as string)?.trim();
     const name = (formData.get('name') as string)?.trim();
     const developerType = (formData.get('devType') as string)?.trim() || 'solo';
@@ -91,7 +92,7 @@ export function LandingPage() {
 
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailPattern.test(email)) {
-      setFormMessage('That doesn’t look like a valid email address.');
+      setFormMessage("That doesn't look like a valid email address.");
       return;
     }
 
@@ -99,18 +100,31 @@ export function LandingPage() {
     setFormState('submitting');
 
     try {
-      await apiService.submitEarlyAccess({
+      const result = await apiService.submitEarlyAccess({
         email,
         name: name || undefined,
         developerType,
       });
-      setFormState('success');
-      setFormMessage(null);
-      event.currentTarget.reset();
+      
+      if (result.success) {
+        setFormState('success');
+        setFormMessage(null);
+        form.reset();
+      } else {
+        setFormState('idle');
+        setFormMessage('Something went wrong. Please try again.');
+      }
     } catch (error) {
+      console.error('[LandingPage] Early access submission error:', error);
       setFormState('idle');
       if (error instanceof ApiError) {
-        setFormMessage(error.status === 400 ? 'Please check your details and try again.' : 'Something went wrong. Please try again in a moment.');
+        if (error.status === 400) {
+          setFormMessage('Please check your details and try again.');
+        } else if (error.status === 0) {
+          setFormMessage('Network error. Please check your connection and try again.');
+        } else {
+          setFormMessage('Something went wrong. Please try again in a moment.');
+        }
       } else {
         setFormMessage('Network error. Please try again.');
       }
