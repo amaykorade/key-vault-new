@@ -12,14 +12,6 @@ const earlyAccessSchema = z.object({
 });
 
 router.post('/early-access', async (req, res) => {
-  // Set a timeout for this request
-  const timeout = setTimeout(() => {
-    if (!res.headersSent) {
-      console.error('[public] Early access request timeout');
-      res.status(504).json({ success: false, error: 'Request timeout' });
-    }
-  }, 30000); // 30 second timeout
-
   try {
     console.log('[public] Early access signup request received:', { 
       body: req.body,
@@ -53,23 +45,21 @@ router.post('/early-access', async (req, res) => {
       });
     }
 
-    try {
-      console.log('[public] Sending confirmation email to:', payload.email);
-      await EmailService.sendEarlyAccessConfirmation(
-        payload.email,
-        payload.name,
-        payload.developerType
-      );
-      console.log('[public] Confirmation email sent successfully');
-    } catch (emailError) {
-      console.error('[public] early access email error:', emailError instanceof Error ? emailError.message : emailError);
-    }
-
-    console.log('[public] Early access signup completed successfully');
-    clearTimeout(timeout);
+    // Send response immediately, don't wait for email
+    console.log('[public] Early access signup saved, responding to client');
     res.json({ success: true });
+
+    // Send email asynchronously in the background (fire and forget)
+    EmailService.sendEarlyAccessConfirmation(
+      payload.email,
+      payload.name,
+      payload.developerType
+    ).then(() => {
+      console.log('[public] Confirmation email sent successfully');
+    }).catch((emailError) => {
+      console.error('[public] early access email error:', emailError instanceof Error ? emailError.message : emailError);
+    });
   } catch (error) {
-    clearTimeout(timeout);
     if (error instanceof z.ZodError) {
       console.error('[public] Validation error:', error.flatten());
       return res.status(400).json({ success: false, error: 'Invalid data', details: error.flatten() });
