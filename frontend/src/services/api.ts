@@ -575,6 +575,9 @@ class ApiService {
     }
     const url = `${base}/public/early-access`;
     
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
+    
     try {
       console.log('[API] Submitting early access:', { url, data: { email: data.email, developerType: data.developerType } });
       
@@ -584,7 +587,10 @@ class ApiService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(data),
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       console.log('[API] Response status:', response.status, response.statusText);
 
@@ -607,9 +613,14 @@ class ApiService {
       console.log('[API] Early access success:', result);
       return result;
     } catch (error) {
+      clearTimeout(timeoutId);
       console.error('[API] Early access fetch error:', error);
       if (error instanceof ApiError) {
         throw error;
+      }
+      // Handle abort/timeout errors
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new ApiError('Request timeout. Please try again.', 0);
       }
       // Re-throw network errors as ApiError with status 0
       throw new ApiError(

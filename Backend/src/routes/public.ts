@@ -12,8 +12,20 @@ const earlyAccessSchema = z.object({
 });
 
 router.post('/early-access', async (req, res) => {
+  // Set a timeout for this request
+  const timeout = setTimeout(() => {
+    if (!res.headersSent) {
+      console.error('[public] Early access request timeout');
+      res.status(504).json({ success: false, error: 'Request timeout' });
+    }
+  }, 30000); // 30 second timeout
+
   try {
-    console.log('[public] Early access signup request received:', { body: req.body });
+    console.log('[public] Early access signup request received:', { 
+      body: req.body,
+      origin: req.headers.origin,
+      'user-agent': req.headers['user-agent']
+    });
     const payload = earlyAccessSchema.parse(req.body);
     console.log('[public] Validated payload:', { email: payload.email, developerType: payload.developerType });
 
@@ -54,8 +66,10 @@ router.post('/early-access', async (req, res) => {
     }
 
     console.log('[public] Early access signup completed successfully');
+    clearTimeout(timeout);
     res.json({ success: true });
   } catch (error) {
+    clearTimeout(timeout);
     if (error instanceof z.ZodError) {
       console.error('[public] Validation error:', error.flatten());
       return res.status(400).json({ success: false, error: 'Invalid data', details: error.flatten() });
