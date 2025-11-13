@@ -569,7 +569,11 @@ class ApiService {
   }
 
   async submitEarlyAccess(data: { email: string; name?: string; developerType: string }): Promise<{ success: boolean }> {
-    const url = `${this.baseURL}/public/early-access`;
+    let base = this.baseURL.endsWith('/') ? this.baseURL.slice(0, -1) : this.baseURL;
+    if (!base.endsWith('/api')) {
+      base = base.endsWith('/') ? `${base}api` : `${base}/api`;
+    }
+    const url = `${base}/public/early-access`;
     
     try {
       console.log('[API] Submitting early access:', { url, data: { email: data.email, developerType: data.developerType } });
