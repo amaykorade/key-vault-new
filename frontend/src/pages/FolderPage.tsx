@@ -309,16 +309,8 @@ const breadcrumbItems = useMemo(() => {
     if (!id || !env || !vercelConnected) return;
     
     try {
-      const res = await fetch(`/api/vercel/sync-status/${id}/${env}/${folder || 'default'}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        setHasUnsyncedChanges(data.hasUnsyncedChanges);
-      }
+      const data = await apiService.checkVercelSyncStatus(id, env, folder || 'default');
+      setHasUnsyncedChanges(data.hasUnsyncedChanges);
     } catch (error) {
       console.error('Failed to check sync status:', error);
     }
@@ -346,22 +338,12 @@ const breadcrumbItems = useMemo(() => {
         return;
       }
       
-      const res = await fetch(`/api/vercel/status/${orgId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-      });
-      const data = await res.json();
+      const data = await apiService.checkVercelStatus(orgId);
       setVercelConnected(data.connected || false);
       
       // If connected, fetch projects
       if (data.connected) {
-        const projectsRes = await fetch(`/api/vercel/projects/${orgId}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          },
-        });
-        const projectsData = await projectsRes.json();
+        const projectsData = await apiService.getVercelProjects(orgId);
         setVercelProjects(projectsData.projects || []);
       }
     } catch (e) {
@@ -1334,29 +1316,14 @@ const breadcrumbItems = useMemo(() => {
                               
                               const selectedProject = vercelProjects.find(p => p.id === projectToSync);
                               
-                              const res = await fetch(`/api/vercel/sync`, {
-                                method: 'POST',
-                                headers: {
-                                  'Content-Type': 'application/json',
-                                  'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-                                },
-                                body: JSON.stringify({
-                                  projectId: id,
-                                  environment: env,
-                                  folder: folder || 'default',
-                                  vercelProjectId: projectToSync,
-                                  vercelProjectName: selectedProject?.name,
-                                  vercelEnvTarget,
-                                }),
+                              const data = await apiService.syncToVercel({
+                                projectId: id,
+                                environment: env,
+                                folder: folder || 'default',
+                                vercelProjectId: projectToSync,
+                                vercelProjectName: selectedProject?.name,
+                                vercelEnvTarget,
                               });
-                              
-                              if (!res.ok) {
-                                const errorData = await res.json();
-                                alert(`Sync failed: ${errorData.error || 'Unknown error'}`);
-                                return;
-                              }
-                              
-                              const data = await res.json();
                               
                               if (data.success) {
                                 if (data.errors && data.errors.length > 0) {
@@ -1372,7 +1339,7 @@ const breadcrumbItems = useMemo(() => {
                                 }
                                 await checkVercelConnection();
                               } else {
-                                alert(`Sync failed: ${data.error || 'Unknown error'}`);
+                                alert(`Sync failed: ${data.message || 'Unknown error'}`);
                               }
                             } catch (e) {
                               console.error('Sync failed:', e);
@@ -1621,31 +1588,10 @@ const breadcrumbItems = useMemo(() => {
                         return;
                       }
                       
-                      const res = await fetch('/api/vercel/connect', {
-                        method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-                        },
-                        body: JSON.stringify({
-                          accessToken: vercelToken,
-                          organizationId: orgId,
-                        }),
+                      const data = await apiService.connectVercel({
+                        accessToken: vercelToken,
+                        organizationId: orgId,
                       });
-                      
-                      if (!res.ok) {
-                        const text = await res.text();
-                        console.error('Error response:', text);
-                        try {
-                          const errorData = JSON.parse(text);
-                          alert(`Failed to connect: ${errorData.error || 'Unknown error'}`);
-                        } catch {
-                          alert(`Failed to connect: Server returned ${res.status}`);
-                        }
-                        return;
-                      }
-
-                      const data = await res.json();
                       
                       if (data.success) {
                         setVercelConnected(true);
@@ -1653,15 +1599,10 @@ const breadcrumbItems = useMemo(() => {
                         setVercelToken('');
                         
                         // Fetch Vercel projects using the orgId we just got
-                        const projectsRes = await fetch(`/api/vercel/projects/${orgId}`, {
-                          headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-                          },
-                        });
-                        const projectsData = await projectsRes.json();
+                        const projectsData = await apiService.getVercelProjects(orgId);
                         setVercelProjects(projectsData.projects || []);
                       } else {
-                        alert(`Failed to connect: ${data.error || 'Unknown error'}`);
+                        alert(`Failed to connect: ${data.message || 'Unknown error'}`);
                       }
                     } catch (e) {
                       console.error('Failed to connect Vercel:', e);

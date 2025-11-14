@@ -630,6 +630,47 @@ class ApiService {
     }
   }
 
+  // Vercel Integration
+  async checkVercelStatus(organizationId: string): Promise<{ connected: boolean }> {
+    return this.request<{ connected: boolean }>(`/vercel/status/${organizationId}`);
+  }
+
+  async getVercelProjects(organizationId: string): Promise<{ projects: any[] }> {
+    return this.request<{ projects: any[] }>(`/vercel/projects/${organizationId}`);
+  }
+
+  async connectVercel(data: { accessToken: string; organizationId: string; teamId?: string; teamName?: string }): Promise<{ success: boolean; message?: string }> {
+    return this.request<{ success: boolean; message?: string }>('/vercel/connect', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async syncToVercel(data: {
+    projectId: string;
+    environment: string;
+    folder: string;
+    vercelProjectId: string;
+    vercelProjectName?: string;
+    vercelEnvTarget: 'production' | 'preview' | 'development';
+  }): Promise<{ success: boolean; synced: number; errors: string[]; message?: string }> {
+    return this.request<{ success: boolean; synced: number; errors: string[]; message?: string }>('/vercel/sync', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async checkVercelSyncStatus(projectId: string, environment: string, folder: string): Promise<{ hasUnsyncedChanges: boolean }> {
+    return this.request<{ hasUnsyncedChanges: boolean }>(`/vercel/sync-status/${projectId}/${environment}/${folder}`);
+  }
+
+  async getVercelAuthUrl(organizationId: string, returnTo?: string): Promise<{ authUrl: string }> {
+    const params = new URLSearchParams();
+    if (organizationId) params.append('organizationId', organizationId);
+    if (returnTo) params.append('returnTo', returnTo);
+    return this.request<{ authUrl: string }>(`/vercel/auth/redirect?${params.toString()}`);
+  }
+
   // Utility methods
   isAuthenticated(): boolean {
     return !!this.accessToken;
