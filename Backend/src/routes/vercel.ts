@@ -100,21 +100,30 @@ router.post('/connect', requireAuth, async (req: AuthRequest, res) => {
     const schema = z.object({
       accessToken: z.string().min(1),
       organizationId: z.string().uuid(),
+      name: z.string().optional(), // Optional name for this integration
       teamId: z.string().optional(),
       teamName: z.string().optional(),
     });
 
     const data = schema.parse(req.body);
 
-    await VercelService.storeAccessToken(
+    const integration = await VercelService.storeAccessToken(
       req.user.id,
       data.organizationId,
       data.accessToken,
+      data.name,
       data.teamId,
       data.teamName
     );
 
-    res.json({ success: true, message: 'Vercel connected successfully' });
+    res.json({ 
+      success: true, 
+      message: 'Vercel connected successfully',
+      integration: {
+        id: integration.id,
+        name: integration.name,
+      },
+    });
   } catch (error: any) {
     console.error('Failed to connect Vercel:', error);
     console.error('Error stack:', error.stack);
@@ -144,34 +153,66 @@ router.get('/status/:organizationId', requireAuth, async (req: AuthRequest, res)
 });
 
 /**
- * GET /vercel/projects/:organizationId
- * List all Vercel projects
+ * GET /vercel/integrations/:organizationId
+ * List all Vercel integrations for an organization
  */
-router.get('/projects/:organizationId', requireAuth, async (req: AuthRequest, res) => {
+router.get('/integrations/:organizationId', requireAuth, async (req: AuthRequest, res) => {
   try {
     const { organizationId } = req.params;
+    const integrations = await VercelService.listIntegrations(req.user!.id, organizationId);
+    res.json({ integrations });
+  } catch (error) {
+    console.error('Failed to list Vercel integrations:', error);
+    res.status(500).json({ error: 'Failed to fetch Vercel integrations' });
+  }
+});
 
-    const accessToken = await VercelService.getAccessToken(req.user!.id, organizationId);
+/**
+ * GET /vercel/projects/:integrationId
+ * List all Vercel projects for a specific integration
+ */
+router.get('/projects/:integrationId', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { integrationId } = req.params;
+
+    const accessToken = await VercelService.getAccessToken(integrationId);
     if (!accessToken) {
-      return res.status(404).json({ error: 'Vercel not connected' });
+      return res.status(404).json({ error: 'Vercel integration not found' });
     }
 
     // Get team ID from integration
     const integration = await require('../lib/db').db.vercelIntegration.findUnique({
-      where: {
-        userId_organizationId: {
-          userId: req.user!.id,
-          organizationId,
-        },
-      },
+      where: { id: integrationId },
     });
 
-    const projects = await VercelService.listProjects(accessToken, integration?.vercelTeamId || undefined);
+    if (!integration || integration.userId !== req.user!.id) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const projects = await VercelService.listProjects(accessToken, integration.vercelTeamId || undefined);
 
     res.json({ projects });
   } catch (error) {
     console.error('Failed to list Vercel projects:', error);
     res.status(500).json({ error: 'Failed to fetch Vercel projects' });
+  }
+});
+
+/**
+ * DELETE /vercel/integrations/:integrationId
+ * Delete a Vercel integration
+ */
+router.delete('/integrations/:integrationId', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { integrationId } = req.params;
+    await VercelService.deleteIntegration(integrationId, req.user!.id);
+    res.json({ success: true, message: 'Vercel integration deleted successfully' });
+  } catch (error: any) {
+    console.error('Failed to delete Vercel integration:', error);
+    if (error.message === 'Integration not found or access denied') {
+      return res.status(403).json({ error: error.message });
+    }
+    res.status(500).json({ error: error.message || 'Failed to delete Vercel integration' });
   }
 });
 
@@ -185,6 +226,7 @@ router.post('/sync', requireAuth, async (req: AuthRequest, res) => {
       projectId: z.string().uuid(),
       environment: z.string(),
       folder: z.string(),
+      vercelIntegrationId: z.string().uuid(), // Required: which integration to use
       vercelProjectId: z.string(),
       vercelProjectName: z.string().optional(),
       vercelEnvTarget: z.enum(['production', 'preview', 'development']),
@@ -192,8 +234,17 @@ router.post('/sync', requireAuth, async (req: AuthRequest, res) => {
 
     const data = schema.parse(req.body);
 
+    // Verify the integration belongs to the user
+    const integration = await require('../lib/db').db.vercelIntegration.findUnique({
+      where: { id: data.vercelIntegrationId },
+    });
+
+    if (!integration || integration.userId !== req.user!.id) {
+      return res.status(403).json({ error: 'Access denied to this Vercel integration' });
+    }
+
     const result = await VercelService.syncFolderToVercel(
-      req.user!.id,
+      data.vercelIntegrationId,
       data.projectId,
       data.environment,
       data.folder,
@@ -238,15 +289,22 @@ router.post('/sync', requireAuth, async (req: AuthRequest, res) => {
 
 /**
  * DELETE /vercel/disconnect/:organizationId
- * Disconnect Vercel integration
+ * Disconnect all Vercel integrations for an organization (legacy endpoint)
+ * @deprecated Use DELETE /vercel/integrations/:integrationId instead
  */
 router.delete('/disconnect/:organizationId', requireAuth, async (req: AuthRequest, res) => {
   try {
     const { organizationId } = req.params;
 
-    await VercelService.disconnect(req.user!.id, organizationId);
+    // Delete all integrations for this user/organization
+    await require('../lib/db').db.vercelIntegration.deleteMany({
+      where: {
+        userId: req.user!.id,
+        organizationId,
+      },
+    });
 
-    res.json({ success: true, message: 'Vercel disconnected successfully' });
+    res.json({ success: true, message: 'All Vercel integrations disconnected successfully' });
   } catch (error) {
     console.error('Failed to disconnect Vercel:', error);
     res.status(500).json({ error: 'Failed to disconnect Vercel' });
@@ -271,37 +329,169 @@ router.get('/sync-status/:projectId/:environment/:folder', requireAuth, async (r
 });
 
 /**
+ * GET /vercel/sync-config/:projectId/:environment/:folder
+ * Get sync configuration for a folder
+ */
+router.get('/sync-config/:projectId/:environment/:folder', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { projectId, environment, folder } = req.params;
+
+    const config = await VercelService.getSyncConfig(projectId, environment, folder);
+
+    if (!config) {
+      return res.json({ config: null });
+    }
+
+    // Type assertion needed because Prisma types might not be fully updated in IDE
+    const configWithIntegration = config as typeof config & { vercelIntegrationId: string | null };
+
+    res.json({
+      config: {
+        vercelIntegrationId: configWithIntegration.vercelIntegrationId || null,
+        vercelProjectId: config.vercelProjectId,
+        vercelProjectName: config.vercelProjectName,
+        vercelEnvTarget: config.vercelEnvTarget,
+        syncEnabled: config.syncEnabled,
+        autoSync: config.autoSync,
+        lastSyncedAt: config.lastSyncedAt,
+        lastSyncStatus: config.lastSyncStatus,
+        lastSyncError: config.lastSyncError,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to get sync config:', error);
+    res.status(500).json({ error: 'Failed to get sync configuration' });
+  }
+});
+
+/**
+ * POST /vercel/sync-config
+ * Save or update sync configuration for a folder
+ */
+router.post('/sync-config', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const schema = z.object({
+      projectId: z.string().uuid(),
+      environment: z.string(),
+      folder: z.string(),
+      vercelIntegrationId: z.string().uuid(), // Required: which integration to use
+      vercelProjectId: z.string(),
+      vercelProjectName: z.string().optional(),
+      vercelEnvTarget: z.enum(['production', 'preview', 'development']),
+      syncEnabled: z.boolean().optional().default(true),
+      autoSync: z.boolean().optional().default(false),
+    });
+
+    const data = schema.parse(req.body);
+
+    // Verify user has access to the project
+    const project = await require('../lib/db').db.project.findUnique({
+      where: { id: data.projectId },
+      include: { members: true },
+    });
+
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    const hasAccess = project.members.some((m: { userId: string }) => m.userId === req.user!.id);
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Verify the integration belongs to the user
+    const integration = await require('../lib/db').db.vercelIntegration.findUnique({
+      where: { id: data.vercelIntegrationId },
+    });
+
+    if (!integration || integration.userId !== req.user!.id) {
+      return res.status(403).json({ error: 'Access denied to this Vercel integration' });
+    }
+
+    // Save or update sync configuration
+    const config = await require('../lib/db').db.folderVercelSync.upsert({
+      where: {
+        projectId_environment_folder: {
+          projectId: data.projectId,
+          environment: data.environment,
+          folder: data.folder,
+        },
+      },
+      create: {
+        projectId: data.projectId,
+        environment: data.environment,
+        folder: data.folder,
+        vercelIntegrationId: data.vercelIntegrationId,
+        vercelProjectId: data.vercelProjectId,
+        vercelProjectName: data.vercelProjectName,
+        vercelEnvTarget: data.vercelEnvTarget,
+        syncEnabled: data.syncEnabled ?? true,
+        autoSync: data.autoSync ?? false,
+      },
+      update: {
+        vercelIntegrationId: data.vercelIntegrationId,
+        vercelProjectId: data.vercelProjectId,
+        vercelProjectName: data.vercelProjectName,
+        vercelEnvTarget: data.vercelEnvTarget,
+        syncEnabled: data.syncEnabled ?? true,
+        autoSync: data.autoSync ?? false,
+      },
+    });
+
+    // Type assertion needed because Prisma types might not be fully updated in IDE
+    const configWithIntegration = config as typeof config & { vercelIntegrationId: string | null };
+
+    res.json({
+      success: true,
+      config: {
+        vercelIntegrationId: configWithIntegration.vercelIntegrationId || null,
+        vercelProjectId: config.vercelProjectId,
+        vercelProjectName: config.vercelProjectName,
+        vercelEnvTarget: config.vercelEnvTarget,
+        syncEnabled: config.syncEnabled,
+        autoSync: config.autoSync,
+      },
+    });
+  } catch (error: any) {
+    console.error('Failed to save sync config:', error);
+    if (error.name === 'ZodError') {
+      return res.status(400).json({ error: 'Invalid request data' });
+    }
+    res.status(500).json({ error: error.message || 'Failed to save sync configuration' });
+  }
+});
+
+/**
  * POST /vercel/deploy
  * Trigger a Vercel deployment
  */
 router.post('/deploy', requireAuth, async (req: AuthRequest, res) => {
   try {
     const schema = z.object({
-      organizationId: z.string().uuid(),
+      vercelIntegrationId: z.string().uuid(), // Required: which integration to use
       vercelProjectId: z.string(),
     });
 
     const data = schema.parse(req.body);
 
-    const accessToken = await VercelService.getAccessToken(req.user!.id, data.organizationId);
+    const accessToken = await VercelService.getAccessToken(data.vercelIntegrationId);
     if (!accessToken) {
-      return res.status(404).json({ error: 'Vercel not connected' });
+      return res.status(404).json({ error: 'Vercel integration not found' });
     }
 
     // Get team ID from integration
     const integration = await require('../lib/db').db.vercelIntegration.findUnique({
-      where: {
-        userId_organizationId: {
-          userId: req.user!.id,
-          organizationId: data.organizationId,
-        },
-      },
+      where: { id: data.vercelIntegrationId },
     });
+
+    if (!integration || integration.userId !== req.user!.id) {
+      return res.status(403).json({ error: 'Access denied to this Vercel integration' });
+    }
 
     const result = await VercelService.triggerDeployment(
       accessToken,
       data.vercelProjectId,
-      integration?.vercelTeamId || undefined
+      integration.vercelTeamId || undefined
     );
 
     if (result.success) {

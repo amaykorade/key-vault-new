@@ -8,28 +8,28 @@ datasource db {
 }
 
 model User {
-  id               String           @id @default(uuid())
-  email            String           @unique
-  passwordHash     String?
-  name             String?
-  emailVerifiedAt  DateTime?
-  lastLoginAt      DateTime?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  image            String?
-  accounts         Account[]
-  memberships      Membership[]
-  ownedOrgs        Organization[]
-  createdSecrets   Secret[]
-  createdFolders   Folder[]
-  cliTokens        CliToken[]
-  teamMemberships  TeamMembership[]
-  createdTeams     Team[]
-  sentInvitations  Invitation[]
+  id                 String              @id @default(uuid())
+  email              String              @unique
+  passwordHash       String?
+  name               String?
+  emailVerifiedAt    DateTime?
+  lastLoginAt        DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  image              String?
+  accounts           Account[]
+  auditLogs          AuditLog[]
+  cliTokens          CliToken[]
+  createdFolders     Folder[]
+  sentInvitations    Invitation[]
+  memberships        Membership[]
+  ownedOrgs          Organization[]
+  createdApiKeys     ProjectApiKey[]
   projectMemberships ProjectMember[]
-  auditLogs        AuditLog[]
-  createdApiKeys   ProjectApiKey[]
-  apiTokens        UserApiToken[]
+  createdSecrets     Secret[]
+  createdTeams       Team[]
+  teamMemberships    TeamMembership[]
+  apiTokens          UserApiToken[]
   vercelIntegrations VercelIntegration[]
 
   @@index([email])
@@ -37,20 +37,19 @@ model User {
 
 /// Personal Access Token (user-scoped) that inherits user's RBAC
 model UserApiToken {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   userId       String
   name         String
-  tokenHash    String   @unique
-  projects     String[] @default([])
-  environments String[] @default([])
-  folders      String[] @default([])
-  ipAllowlist  String[] @default([])
+  tokenHash    String    @unique
+  projects     String[]  @default([])
+  environments String[]  @default([])
+  folders      String[]  @default([])
+  ipAllowlist  String[]  @default([])
   expiresAt    DateTime?
   lastUsedAt   DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -75,19 +74,19 @@ model Account {
 }
 
 model Organization {
-  id          String       @id @default(uuid())
-  name        String
-  slug        String       @unique
-  description String?
-  ownerId     String
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  memberships Membership[]
-  owner       User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  projects    Project[]
-  teams       Team[]
-  invitations Invitation[]
-  auditLogs   AuditLog[]
+  id                 String              @id @default(uuid())
+  name               String
+  slug               String              @unique
+  description        String?
+  ownerId            String
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  auditLogs          AuditLog[]
+  invitations        Invitation[]
+  memberships        Membership[]
+  owner              User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  projects           Project[]
+  teams              Team[]
   vercelIntegrations VercelIntegration[]
 
   @@index([ownerId])
@@ -110,20 +109,20 @@ model Membership {
 }
 
 model Project {
-  id             String          @id @default(uuid())
+  id             String             @id @default(uuid())
   name           String
   description    String?
   organizationId String
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  secrets        Secret[]
-  folders        Folder[]
-  teams          TeamProject[]
-  members        ProjectMember[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
   auditLogs      AuditLog[]
-  apiKeys        ProjectApiKey[]
+  folders        Folder[]
   vercelSyncs    FolderVercelSync[]
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  apiKeys        ProjectApiKey[]
+  members        ProjectMember[]
+  secrets        Secret[]
+  teams          TeamProject[]
 
   @@index([organizationId])
 }
@@ -135,20 +134,12 @@ model ProjectMember {
   role      ProjectRole @default(READ)
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
-  
   project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   @@unique([projectId, userId])
   @@index([projectId])
   @@index([userId])
-}
-
-enum ProjectRole {
-  OWNER  // Full control, can delete project
-  ADMIN  // Can manage members and secrets
-  WRITE  // Can create/edit secrets
-  READ   // View only
 }
 
 model Secret {
@@ -164,35 +155,34 @@ model Secret {
   updatedAt   DateTime   @updatedAt
   environment String     @default("development")
   folder      String?    @default("default")
+  auditLogs   AuditLog[]
   createdBy   User       @relation(fields: [createdById], references: [id], onDelete: Cascade)
   project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  auditLogs   AuditLog[]
 
+  @@unique([projectId, name, environment, folder])
   @@index([projectId])
   @@index([createdById])
   @@index([type])
   @@index([environment])
   @@index([folder])
-  @@unique([projectId, name, environment, folder])
 }
 
 model Folder {
-  id            String   @id @default(uuid())
-  projectId     String
-  environment   String
-  name          String
-  slug          String
-  description   String?
-  createdById   String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id          String   @id @default(uuid())
+  projectId   String
+  environment String
+  name        String
+  slug        String
+  description String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy     User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
-
+  @@unique([projectId, environment, slug])
   @@index([projectId])
   @@index([environment])
-  @@unique([projectId, environment, slug])
 }
 
 model Team {
@@ -203,13 +193,12 @@ model Team {
   createdById    String
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
-  
-  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitations    Invitation[]
   createdBy      User             @relation(fields: [createdById], references: [id])
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   members        TeamMembership[]
   projects       TeamProject[]
-  invitations    Invitation[]
-  
+
   @@index([organizationId])
   @@index([createdById])
 }
@@ -221,33 +210,31 @@ model TeamMembership {
   role      TeamRole @default(MEMBER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId, teamId])
   @@index([teamId])
   @@index([userId])
 }
 
 model Invitation {
-  id             String           @id @default(uuid())
+  id             String       @id @default(uuid())
   email          String
   organizationId String
   teamId         String?
-  role           Role             @default(MEMBER)
-  teamRole       TeamRole?        @default(MEMBER)
+  role           Role         @default(MEMBER)
+  teamRole       TeamRole?    @default(MEMBER)
   invitedById    String
-  token          String           @unique
+  token          String       @unique
   expiresAt      DateTime
   acceptedAt     DateTime?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  
-  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  team           Team?            @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  invitedBy      User             @relation(fields: [invitedById], references: [id])
-  
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  invitedBy      User         @relation(fields: [invitedById], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  team           Team?        @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
   @@index([email])
   @@index([token])
   @@index([organizationId])
@@ -255,24 +242,16 @@ model Invitation {
   @@index([expiresAt])
 }
 
-enum Role {
-  OWNER
-  ADMIN
-  MEMBER
-  VIEWER
-}
-
 model TeamProject {
-  id          String                   @id @default(uuid())
+  id          String                  @id @default(uuid())
   teamId      String
   projectId   String
-  createdAt   DateTime                 @default(now())
-  updatedAt   DateTime                 @updatedAt
-  
-  team        Team                     @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  project     Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  project     Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  team        Team                    @relation(fields: [teamId], references: [id], onDelete: Cascade)
   permissions TeamProjectPermission[]
-  
+
   @@unique([teamId, projectId])
   @@index([teamId])
   @@index([projectId])
@@ -283,11 +262,160 @@ model TeamProjectPermission {
   teamProjectId String
   permission    ProjectPermission
   createdAt     DateTime          @default(now())
-  
   teamProject   TeamProject       @relation(fields: [teamProjectId], references: [id], onDelete: Cascade)
-  
+
   @@unique([teamProjectId, permission])
   @@index([teamProjectId])
+}
+
+model AuditLog {
+  id             String        @id @default(uuid())
+  userId         String?
+  organizationId String?
+  projectId      String?
+  secretId       String?
+  eventType      String
+  action         String
+  resourceName   String?
+  description    String?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime      @default(now())
+  environment    String?
+  folder         String?
+  metadata       Json?
+  resourceType   String?
+  tokenId        String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  project        Project?      @relation(fields: [projectId], references: [id])
+  secret         Secret?       @relation(fields: [secretId], references: [id])
+  user           User?         @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([eventType])
+  @@index([createdAt])
+  @@index([environment])
+  @@index([folder])
+  @@index([resourceType])
+}
+
+/// API key for project-level secret access via public API
+model ProjectApiKey {
+  id           String    @id @default(uuid())
+  projectId    String
+  name         String
+  tokenHash    String    @unique
+  scopes       Json?
+  environments String[]  @default([])
+  folders      String[]  @default([])
+  ipAllowlist  String[]  @default([])
+  expiresAt    DateTime?
+  lastUsedAt   DateTime?
+  createdById  String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  createdBy    User      @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model VercelIntegration {
+  id                String             @id @default(uuid())
+  userId            String
+  organizationId    String
+  vercelAccessToken String
+  vercelTeamId      String?
+  vercelTeamName    String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  name              String             @default("Default")
+  syncs             FolderVercelSync[]
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([userId, organizationId])
+}
+
+model FolderVercelSync {
+  id                  String             @id @default(uuid())
+  projectId           String
+  environment         String
+  folder              String
+  vercelProjectId     String
+  vercelProjectName   String?
+  vercelEnvTarget     String
+  syncEnabled         Boolean            @default(true)
+  autoSync            Boolean            @default(false)
+  lastSyncedAt        DateTime?
+  lastSyncStatus      String?
+  lastSyncError       String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  vercelIntegrationId String?
+  project             Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  vercelIntegration   VercelIntegration? @relation(fields: [vercelIntegrationId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, environment, folder])
+  @@index([projectId])
+  @@index([vercelProjectId])
+  @@index([vercelIntegrationId])
+}
+
+model CliToken {
+  id          String          @id @default(uuid())
+  tokenHash   String          @unique
+  userId      String
+  name        String?
+  createdAt   DateTime        @default(now())
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  deviceCodes CliDeviceCode[]
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model CliDeviceCode {
+  id         String    @id @default(uuid())
+  deviceCode String    @unique
+  userCode   String    @unique
+  userId     String?
+  cliTokenId String?
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+  verifiedAt DateTime?
+  cliToken   CliToken? @relation(fields: [cliTokenId], references: [id])
+
+  @@index([deviceCode])
+  @@index([userCode])
+  @@index([userId])
+}
+
+model EarlyAccessSignup {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  name          String?
+  developerType String
+  createdAt     DateTime @default(now())
+}
+
+enum ProjectRole {
+  OWNER
+  ADMIN
+  WRITE
+  READ
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
 }
 
 enum TeamRole {
@@ -313,154 +441,4 @@ enum SecretType {
   CERTIFICATE
   PASSWORD
   OTHER
-}
-
-model AuditLog {
-  id             String    @id @default(uuid())
-  userId         String?
-  organizationId String?
-  projectId      String?
-  secretId       String?
-  tokenId        String?
-  
-  // Event details
-  eventType      String    // 'user_login', 'secret_access', 'secret_create', etc.
-  action         String    // 'view', 'create', 'update', 'delete', 'success', 'failed'
-  resourceName   String?   // 'Secret: API_KEY', 'Project: My App', 'User: john@example.com'
-  resourceType   String?   // 'secret', 'token', 'project', 'user', 'folder'
-  
-  // Context for filtering by folder/environment
-  environment    String?
-  folder         String?
-  
-  // Metadata for structured data (changes, diffs, etc.)
-  metadata       Json?     // { changedFields: [...], from: {...}, to: {...}, scopes: [...], etc. }
-  
-  // Context
-  description    String?
-  ipAddress      String?
-  userAgent      String?
-  
-  // Timestamps
-  createdAt      DateTime  @default(now())
-  
-  // Relations
-  user           User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
-  organization   Organization?    @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  project        Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  secret         Secret?          @relation(fields: [secretId], references: [id], onDelete: SetNull)
-  
-  @@index([userId])
-  @@index([organizationId])
-  @@index([projectId])
-  @@index([eventType])
-  @@index([createdAt])
-  @@index([environment])
-  @@index([folder])
-  @@index([resourceType])
-}
-
-/// API key for project-level secret access via public API
-model ProjectApiKey {
-  id           String   @id @default(uuid())
-  projectId    String
-  name         String
-  tokenHash    String   @unique // sha256(token) hex
-  scopes       Json?
-  environments String[] @default([])
-  folders      String[] @default([])
-  ipAllowlist  String[] @default([])
-  expiresAt    DateTime?
-  lastUsedAt   DateTime?
-  createdById  String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy    User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
-
-  @@index([projectId])
-}
-
-// Vercel Integration
-model VercelIntegration {
-  id                String   @id @default(uuid())
-  userId            String
-  organizationId    String
-  vercelAccessToken String   // Encrypted Vercel OAuth token
-  vercelTeamId      String?  // Vercel team ID if applicable
-  vercelTeamName    String?  // Vercel team name for display
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  
-  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  
-  @@unique([userId, organizationId])
-  @@index([userId])
-  @@index([organizationId])
-}
-
-// Folder → Vercel Project Sync Configuration
-model FolderVercelSync {
-  id              String    @id @default(uuid())
-  projectId       String
-  environment     String    // development, staging, production
-  folder          String    // default, api, etc.
-  vercelProjectId String    // Vercel project ID
-  vercelProjectName String? // Vercel project name for display
-  vercelEnvTarget String    // "production", "preview", "development"
-  syncEnabled     Boolean   @default(true)
-  autoSync        Boolean   @default(false)
-  lastSyncedAt    DateTime?
-  lastSyncStatus  String?   // "success", "failed", "pending"
-  lastSyncError   String?   // Error message if sync failed
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
-  project         Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  @@unique([projectId, environment, folder])
-  @@index([projectId])
-  @@index([vercelProjectId])
-}
-
-model CliToken {
-  id          String           @id @default(uuid())
-  tokenHash   String           @unique
-  userId      String
-  name        String?
-  createdAt   DateTime         @default(now())
-  lastUsedAt  DateTime?
-  expiresAt   DateTime?
-
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deviceCodes CliDeviceCode[]
-
-  @@index([userId])
-}
-
-model CliDeviceCode {
-  id          String   @id @default(uuid())
-  deviceCode  String   @unique
-  userCode    String   @unique
-  userId      String?
-  cliTokenId  String?
-  expiresAt   DateTime
-  createdAt   DateTime @default(now())
-  verifiedAt  DateTime?
-
-  cliToken    CliToken? @relation(fields: [cliTokenId], references: [id], onDelete: SetNull)
-
-  @@index([deviceCode])
-  @@index([userCode])
-  @@index([userId])
-}
-
-model EarlyAccessSignup {
-  id            String   @id @default(uuid())
-  email         String   @unique
-  name          String?
-  developerType String
-  createdAt     DateTime @default(now())
 }

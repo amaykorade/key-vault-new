@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table';
 import { Button } from '../components/ui/Button';
@@ -184,13 +185,26 @@ export function FolderPage() {
   
   // Vercel integration state
   const [vercelConnected, setVercelConnected] = useState(false);
+  const [vercelIntegrations, setVercelIntegrations] = useState<Array<{
+    id: string;
+    name: string;
+    vercelTeamId: string | null;
+    vercelTeamName: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>>([]);
+  const [selectedVercelIntegration, setSelectedVercelIntegration] = useState<string>('');
   const [vercelProjects, setVercelProjects] = useState<any[]>([]);
   const [selectedVercelProject, setSelectedVercelProject] = useState<string>('');
   const [vercelEnvTarget, setVercelEnvTarget] = useState<'production' | 'preview' | 'development'>('development');
   const [isSyncing, setIsSyncing] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
+  const [showConfigModal, setShowConfigModal] = useState(false);
   const [vercelToken, setVercelToken] = useState('');
+  const [vercelIntegrationName, setVercelIntegrationName] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const [isDeletingIntegration, setIsDeletingIntegration] = useState<string | null>(null);
   const [showSyncSuccessModal, setShowSyncSuccessModal] = useState(false);
   const [syncResult, setSyncResult] = useState<{ synced: number; projectName: string; envTarget: string } | null>(null);
   const [isTriggeringDeploy, setIsTriggeringDeploy] = useState(false);
@@ -325,7 +339,7 @@ const breadcrumbItems = useMemo(() => {
   }, [id, env, folder, vercelConnected]);
 
   async function checkVercelConnection() {
-    if (!id) return;
+    if (!id || !env || !folder) return;
     
     try {
       // Get project to find organizationId
@@ -341,13 +355,73 @@ const breadcrumbItems = useMemo(() => {
       const data = await apiService.checkVercelStatus(orgId);
       setVercelConnected(data.connected || false);
       
-      // If connected, fetch projects
+      // If connected, fetch integrations and load saved sync config
       if (data.connected) {
-        const projectsData = await apiService.getVercelProjects(orgId);
-        setVercelProjects(projectsData.projects || []);
+        try {
+          // Fetch all integrations
+          const integrationsData = await apiService.getVercelIntegrations(orgId);
+          setVercelIntegrations(integrationsData.integrations || []);
+          
+          // Load saved sync configuration
+          const configData = await apiService.getVercelSyncConfig(id, env, folder || 'default');
+          if (configData.config) {
+            // Load project and environment from saved config
+            if (configData.config.vercelProjectId) {
+              setSelectedVercelProject(configData.config.vercelProjectId);
+            }
+            if (configData.config.vercelEnvTarget) {
+              setVercelEnvTarget(configData.config.vercelEnvTarget);
+            }
+            
+            // If integration ID exists, use it; otherwise use first integration (backward compatibility)
+            if (configData.config.vercelIntegrationId) {
+              setSelectedVercelIntegration(configData.config.vercelIntegrationId);
+              // Fetch projects for the selected integration
+              try {
+                const projectsData = await apiService.getVercelProjects(configData.config.vercelIntegrationId);
+                setVercelProjects(projectsData.projects || []);
+              } catch (projectsError) {
+                console.error('Failed to load Vercel projects:', projectsError);
+              }
+            } else if (integrationsData.integrations.length > 0) {
+              // Backward compatibility: use first integration if config doesn't have integration ID
+              const firstIntegration = integrationsData.integrations[0];
+              setSelectedVercelIntegration(firstIntegration.id);
+              try {
+                const projectsData = await apiService.getVercelProjects(firstIntegration.id);
+                setVercelProjects(projectsData.projects || []);
+              } catch (projectsError) {
+                console.error('Failed to load Vercel projects:', projectsError);
+              }
+            }
+          } else if (integrationsData.integrations.length > 0) {
+            // If no config but integrations exist, use the first one
+            const firstIntegration = integrationsData.integrations[0];
+            setSelectedVercelIntegration(firstIntegration.id);
+            try {
+              const projectsData = await apiService.getVercelProjects(firstIntegration.id);
+              setVercelProjects(projectsData.projects || []);
+            } catch (projectsError) {
+              console.error('Failed to load Vercel projects:', projectsError);
+            }
+          }
+        } catch (configError) {
+          console.error('Failed to load integrations or sync config:', configError);
+          // If no config exists, that's okay - user needs to configure
+        }
       }
     } catch (e) {
       console.error('Failed to check Vercel connection:', e);
+    }
+  }
+
+  async function loadVercelProjects(integrationId: string) {
+    try {
+      const projectsData = await apiService.getVercelProjects(integrationId);
+      setVercelProjects(projectsData.projects || []);
+    } catch (error) {
+      console.error('Failed to load Vercel projects:', error);
+      setVercelProjects([]);
     }
   }
 
@@ -421,6 +495,7 @@ const breadcrumbItems = useMemo(() => {
       setTimeout(() => checkSyncStatus(), 100);
     }
   }
+
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -1170,19 +1245,12 @@ const breadcrumbItems = useMemo(() => {
 
       {/* Connected Syncs Tab */}
       {activeTab === 'integrations' && (
-        <Card className="hover-lift">
-          <CardHeader className="pb-3 flex flex-row items-center justify-between">
-            <CardTitle className="text-white text-sm font-semibold">Connected Syncs</CardTitle>
-            <button
-              onClick={() => setShowConnectModal(true)}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded-lg transition-colors flex items-center gap-1.5"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add Sync
-            </button>
-          </CardHeader>
+        <div className="space-y-6">
+          {/* Syncs Configuration Card */}
+          <Card className="hover-lift">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-white text-sm font-semibold">Sync Configuration</CardTitle>
+            </CardHeader>
           <CardContent className="space-y-6">
             {/* Manual Redeploy Warning (MVP Notice) */}
             <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
@@ -1242,34 +1310,47 @@ const breadcrumbItems = useMemo(() => {
                     </TableCell>
                     <TableCell>
                       <div className="text-sm text-gray-300">
-                        {(() => {
-                          const projectToShow = selectedVercelProject || vercelProjects[0]?.id;
-                          const project = vercelProjects.find(p => p.id === projectToShow);
-                          return project ? (
-                            <span className="font-medium text-white">{project.name}</span>
-                          ) : (
-                            <span className="text-gray-500">Not configured</span>
-                          );
-                        })()}
+                        {selectedVercelIntegration && selectedVercelProject ? (
+                          (() => {
+                            const integration = vercelIntegrations.find(i => i.id === selectedVercelIntegration);
+                            const project = vercelProjects.find(p => p.id === selectedVercelProject);
+                            return integration && project ? (
+                              <div className="flex flex-col gap-1">
+                                <span className="font-medium text-white">{integration.name}</span>
+                                <span className="text-xs text-gray-400">{project.name}</span>
+                              </div>
+                            ) : (
+                              <span className="text-gray-500">Configuration incomplete</span>
+                            );
+                          })()
+                        ) : (
+                          <span className="text-gray-500">Not configured</span>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                        {(() => {
-                          const projectToShow = selectedVercelProject || vercelProjects[0]?.id;
-                          const project = vercelProjects.find(p => p.id === projectToShow);
-                          return project ? (
-                            <div className="flex items-center gap-2 text-gray-300">
-                              <span className="font-medium text-white">{project.name}</span>
-                              <span className="text-gray-500">/</span>
-                              <span className="capitalize text-gray-300">{vercelEnvTarget}</span>
-                              <span className="text-gray-500">/</span>
-                              <span className="text-gray-400">Encrypted</span>
-                            </div>
-                          ) : (
-                            <span className="text-gray-500">Not configured</span>
-                          );
-                        })()}
+                        {selectedVercelIntegration && selectedVercelProject ? (
+                          (() => {
+                            const integration = vercelIntegrations.find(i => i.id === selectedVercelIntegration);
+                            const project = vercelProjects.find(p => p.id === selectedVercelProject);
+                            return integration && project ? (
+                              <div className="flex items-center gap-2 text-gray-300">
+                                <span className="font-medium text-white">{integration.name}</span>
+                                <span className="text-gray-500">→</span>
+                                <span className="font-medium text-white">{project.name}</span>
+                                <span className="text-gray-500">/</span>
+                                <span className="capitalize text-gray-300">{vercelEnvTarget}</span>
+                                <span className="text-gray-500">/</span>
+                                <span className="text-gray-400">Encrypted</span>
+                              </div>
+                            ) : (
+                              <span className="text-gray-500">Configuration incomplete</span>
+                            );
+                          })()
+                        ) : (
+                          <span className="text-gray-500">Not configured</span>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -1292,9 +1373,27 @@ const breadcrumbItems = useMemo(() => {
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
-                          onClick={() => {
-                            // Open edit/configure modal
-                            setShowConnectModal(true);
+                          onClick={async () => {
+                            // Load saved configuration before opening modal
+                            if (id && env && folder) {
+                              try {
+                                const configData = await apiService.getVercelSyncConfig(id, env, folder || 'default');
+                                if (configData.config) {
+                                  setSelectedVercelIntegration(configData.config.vercelIntegrationId || '');
+                                  setSelectedVercelProject(configData.config.vercelProjectId);
+                                  setVercelEnvTarget(configData.config.vercelEnvTarget);
+                                  
+                                  // Load projects for the selected integration
+                                  if (configData.config.vercelIntegrationId) {
+                                    await loadVercelProjects(configData.config.vercelIntegrationId);
+                                  }
+                                }
+                              } catch (error) {
+                                console.error('Failed to load sync config:', error);
+                              }
+                            }
+                            // Open configuration modal
+                            setShowConfigModal(true);
                           }}
                           className="px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-800 rounded transition-colors"
                           title="Configure sync"
@@ -1303,31 +1402,50 @@ const breadcrumbItems = useMemo(() => {
                         </button>
                         <button
                           onClick={async () => {
-                            // Use first project if none selected
-                            const projectToSync = selectedVercelProject || vercelProjects[0]?.id;
+                            if (!id || !env) {
+                              toast.error('Invalid project or environment');
+                              return;
+                            }
                             
-                            if (!id || !env || !projectToSync) {
-                              alert('Please configure the sync first by clicking "Configure"');
+                            // Check if configuration exists
+                            if (!selectedVercelIntegration) {
+                              toast.error('Please configure the sync first by clicking "Configure" to select a Vercel integration, project and environment.');
+                              setShowConfigModal(true);
+                              return;
+                            }
+                            
+                            if (!selectedVercelProject) {
+                              toast.error('Please configure the sync first by clicking "Configure" to select a Vercel project and environment.');
+                              setShowConfigModal(true);
                               return;
                             }
                             
                             try {
                               setIsSyncing(true);
                               
-                              const selectedProject = vercelProjects.find(p => p.id === projectToSync);
+                              const selectedProject = vercelProjects.find(p => p.id === selectedVercelProject);
+                              
+                              if (!selectedProject) {
+                                toast.error('Selected Vercel project not found. Please reconfigure.');
+                                setShowConfigModal(true);
+                                return;
+                              }
                               
                               const data = await apiService.syncToVercel({
                                 projectId: id,
                                 environment: env,
                                 folder: folder || 'default',
-                                vercelProjectId: projectToSync,
-                                vercelProjectName: selectedProject?.name,
+                                vercelIntegrationId: selectedVercelIntegration,
+                                vercelProjectId: selectedVercelProject,
+                                vercelProjectName: selectedProject.name,
                                 vercelEnvTarget,
                               });
                               
                               if (data.success) {
                                 if (data.errors && data.errors.length > 0) {
-                                  alert(`Synced ${data.synced} secret(s) with ${data.errors.length} error(s):\n${data.errors.join('\n')}`);
+                                  toast.error(`Synced ${data.synced} secret(s) with ${data.errors.length} error(s): ${data.errors.join(', ')}`, {
+                                    duration: 5000,
+                                  });
                                 } else {
                                   setSyncResult({
                                     synced: data.synced,
@@ -1339,16 +1457,16 @@ const breadcrumbItems = useMemo(() => {
                                 }
                                 await checkVercelConnection();
                               } else {
-                                alert(`Sync failed: ${data.message || 'Unknown error'}`);
+                                toast.error(`Sync failed: ${data.message || 'Unknown error'}`);
                               }
                             } catch (e) {
                               console.error('Sync failed:', e);
-                              alert('Failed to sync to Vercel. Please try again.');
+                              toast.error('Failed to sync to Vercel. Please try again.');
                             } finally {
                               setIsSyncing(false);
                             }
                           }}
-                          disabled={vercelProjects.length === 0 || isSyncing}
+                          disabled={!selectedVercelIntegration || !selectedVercelProject || vercelProjects.length === 0 || isSyncing}
                           className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {isSyncing ? (
@@ -1389,6 +1507,94 @@ const breadcrumbItems = useMemo(() => {
             )}
           </CardContent>
         </Card>
+
+        {/* Vercel Integrations Management Card */}
+        {vercelConnected && (
+          <Card className="hover-lift">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-white text-sm font-semibold">Vercel Integrations</CardTitle>
+              <button
+                onClick={() => setShowConnectModal(true)}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded-lg transition-colors flex items-center gap-1.5"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Integration
+              </button>
+            </CardHeader>
+            <CardContent>
+              {vercelIntegrations.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-sm text-gray-400 mb-4">No Vercel integrations found</p>
+                  <button
+                    onClick={() => setShowConnectModal(true)}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors text-sm"
+                  >
+                    Add Your First Integration
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {vercelIntegrations.map((integration) => (
+                    <div
+                      key={integration.id}
+                      className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg border border-gray-700 hover:border-gray-600 transition-colors"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="text-sm font-medium text-white">{integration.name}</h4>
+                          {integration.vercelTeamName && (
+                            <span className="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded">
+                              {integration.vercelTeamName}
+                            </span>
+                          )}
+                          {selectedVercelIntegration === integration.id && (
+                            <span className="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                              Active
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-400">
+                          Connected {new Date(integration.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={async () => {
+                            try {
+                              setIsDeletingIntegration(integration.id);
+                              await apiService.deleteVercelIntegration(integration.id);
+                              // Refresh integrations and connection status
+                              await checkVercelConnection();
+                              // If deleted integration was selected, clear selection
+                              if (selectedVercelIntegration === integration.id) {
+                                setSelectedVercelIntegration('');
+                                setSelectedVercelProject('');
+                                setVercelProjects([]);
+                              }
+                              toast.success('Vercel integration deleted successfully');
+                            } catch (error) {
+                              console.error('Failed to delete integration:', error);
+                              toast.error('Failed to delete integration. Please try again.');
+                            } finally {
+                              setIsDeletingIntegration(null);
+                            }
+                          }}
+                          disabled={isDeletingIntegration === integration.id}
+                          className="px-3 py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isDeletingIntegration === integration.id ? 'Deleting...' : 'Delete'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+        </div>
       )}
 
       {/* Sync Success Modal with Auto Deployment */}
@@ -1524,9 +1730,28 @@ const breadcrumbItems = useMemo(() => {
                 </ol>
               </div>
 
+              {/* Integration Name Input */}
+              <div className="mb-4">
+                <label className="text-sm font-medium text-gray-300 mb-2 block">
+                  Integration Name <span className="text-gray-500">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={vercelIntegrationName}
+                  onChange={(e) => setVercelIntegrationName(e.target.value)}
+                  placeholder="e.g., Production Vercel, Team Account..."
+                  className="w-full px-4 py-3 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-emerald-500 focus:outline-none"
+                />
+                <p className="text-xs text-gray-500 mt-2">
+                  Give this integration a name to identify it (useful when you have multiple Vercel accounts)
+                </p>
+              </div>
+
               {/* Token Input */}
               <div className="mb-4">
-                <label className="text-sm font-medium text-gray-300 mb-2 block">Vercel Access Token</label>
+                <label className="text-sm font-medium text-gray-300 mb-2 block">
+                  Vercel Access Token <span className="text-red-400">*</span>
+                </label>
                 <input
                   type="password"
                   value={vercelToken}
@@ -1558,6 +1783,7 @@ const breadcrumbItems = useMemo(() => {
                   onClick={() => {
                     setShowConnectModal(false);
                     setVercelToken('');
+                    setVercelIntegrationName('');
                   }}
                   className="flex-1 px-4 py-2 border border-gray-700 text-gray-300 hover:bg-gray-800 rounded-lg transition-colors"
                 >
@@ -1566,12 +1792,12 @@ const breadcrumbItems = useMemo(() => {
                 <button
                   onClick={async () => {
                     if (!vercelToken.trim()) {
-                      alert('Please enter your Vercel token');
+                      toast.error('Please enter your Vercel token');
                       return;
                     }
                     
                     if (!id) {
-                      alert('Invalid project');
+                      toast.error('Invalid project');
                       return;
                     }
                     
@@ -1583,7 +1809,7 @@ const breadcrumbItems = useMemo(() => {
                       const orgId = projectRes.project?.organizationId;
                       
                       if (!orgId) {
-                        alert('Could not determine workspace. Please try again.');
+                        toast.error('Could not determine workspace. Please try again.');
                         setIsConnecting(false);
                         return;
                       }
@@ -1591,22 +1817,50 @@ const breadcrumbItems = useMemo(() => {
                       const data = await apiService.connectVercel({
                         accessToken: vercelToken,
                         organizationId: orgId,
+                        name: vercelIntegrationName.trim() || undefined,
                       });
                       
                       if (data.success) {
                         setVercelConnected(true);
                         setShowConnectModal(false);
                         setVercelToken('');
+                        setVercelIntegrationName('');
                         
-                        // Fetch Vercel projects using the orgId we just got
-                        const projectsData = await apiService.getVercelProjects(orgId);
-                        setVercelProjects(projectsData.projects || []);
+                        // Refresh integrations list and reload connection status
+                        await checkVercelConnection();
+                        
+                        // If a new integration was created, use it
+                        if (data.integration) {
+                          setSelectedVercelIntegration(data.integration.id);
+                          await loadVercelProjects(data.integration.id);
+                          
+                          // Check if sync configuration exists, if not, open config modal
+                          if (id && env && folder) {
+                            try {
+                              const configData = await apiService.getVercelSyncConfig(id, env, folder || 'default');
+                              if (!configData.config) {
+                                // No configuration exists, prompt user to configure
+                                setTimeout(() => {
+                                  setShowConfigModal(true);
+                                }, 500);
+                              }
+                            } catch (configError) {
+                              console.error('Failed to load sync config:', configError);
+                              // Open config modal if we can't load config
+                              setTimeout(() => {
+                                setShowConfigModal(true);
+                              }, 500);
+                            }
+                          }
+                        }
+                        
+                        toast.success('Vercel connected successfully');
                       } else {
-                        alert(`Failed to connect: ${data.message || 'Unknown error'}`);
+                        toast.error(`Failed to connect: ${data.message || 'Unknown error'}`);
                       }
                     } catch (e) {
                       console.error('Failed to connect Vercel:', e);
-                      alert('Failed to connect to Vercel. Please check your token and try again.');
+                      toast.error('Failed to connect to Vercel. Please check your token and try again.');
                     } finally {
                       setIsConnecting(false);
                     }
@@ -1615,6 +1869,189 @@ const breadcrumbItems = useMemo(() => {
                   className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isConnecting ? 'Connecting...' : 'Connect to Vercel'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Configure Vercel Sync Modal */}
+      {showConfigModal && vercelConnected && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="w-full max-w-2xl bg-gray-900 rounded-xl border border-gray-700 shadow-2xl animate-slide-up">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-xl flex items-center justify-center">
+                  <svg className="w-6 h-6 text-blue-400" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2L2 22h20L12 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Configure Vercel Sync</h3>
+                  <p className="text-sm text-gray-400">Select which Vercel integration, project and environment to sync to</p>
+                </div>
+              </div>
+
+              {/* Vercel Integration Selection */}
+              <div className="mb-4">
+                <label className="text-sm font-medium text-gray-300 mb-2 block">
+                  Vercel Integration <span className="text-red-400">*</span>
+                </label>
+                <select
+                  value={selectedVercelIntegration}
+                  onChange={async (e) => {
+                    const integrationId = e.target.value;
+                    setSelectedVercelIntegration(integrationId);
+                    setSelectedVercelProject(''); // Reset project selection
+                    if (integrationId) {
+                      await loadVercelProjects(integrationId);
+                    } else {
+                      setVercelProjects([]);
+                    }
+                  }}
+                  className="w-full px-4 py-3 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="">Select a Vercel integration...</option>
+                  {vercelIntegrations.map((integration) => (
+                    <option key={integration.id} value={integration.id}>
+                      {integration.name} {integration.vercelTeamName ? `(${integration.vercelTeamName})` : ''}
+                    </option>
+                  ))}
+                </select>
+                {vercelIntegrations.length === 0 && (
+                  <p className="text-xs text-gray-500 mt-2">
+                    No Vercel integrations found. Please connect a Vercel account first.
+                  </p>
+                )}
+              </div>
+
+              {/* Vercel Project Selection */}
+              <div className="mb-4">
+                <label className="text-sm font-medium text-gray-300 mb-2 block">
+                  Vercel Project <span className="text-red-400">*</span>
+                </label>
+                <select
+                  value={selectedVercelProject}
+                  onChange={(e) => setSelectedVercelProject(e.target.value)}
+                  disabled={!selectedVercelIntegration}
+                  className="w-full px-4 py-3 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-emerald-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">
+                    {selectedVercelIntegration ? 'Select a Vercel project...' : 'Select an integration first...'}
+                  </option>
+                  {vercelProjects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+                {selectedVercelIntegration && vercelProjects.length === 0 && (
+                  <p className="text-xs text-gray-500 mt-2">
+                    No Vercel projects found. Make sure you have projects in your Vercel account.
+                  </p>
+                )}
+              </div>
+
+              {/* Vercel Environment Target Selection */}
+              <div className="mb-4">
+                <label className="text-sm font-medium text-gray-300 mb-2 block">
+                  Vercel Environment <span className="text-red-400">*</span>
+                </label>
+                <select
+                  value={vercelEnvTarget}
+                  onChange={(e) => setVercelEnvTarget(e.target.value as 'production' | 'preview' | 'development')}
+                  className="w-full px-4 py-3 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="production">Production</option>
+                  <option value="preview">Preview</option>
+                  <option value="development">Development</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-2">
+                  Secrets will be synced to this environment in the selected Vercel project.
+                </p>
+              </div>
+
+              {/* Info Box */}
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4">
+                <div className="flex items-start gap-2">
+                  <svg className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-xs text-gray-300">
+                    <strong className="text-blue-400">Sync Mapping:</strong> This folder ({folder || 'default'}) in {environmentLabel} environment will sync to{' '}
+                    <strong className="text-white">
+                      {selectedVercelIntegration ? vercelIntegrations.find(i => i.id === selectedVercelIntegration)?.name || 'selected integration' : 'selected integration'}
+                    </strong>
+                    {' → '}
+                    <strong className="text-white">{selectedVercelProject ? vercelProjects.find(p => p.id === selectedVercelProject)?.name || 'selected project' : 'selected project'}</strong>{' '}
+                    in <strong className="text-white">{vercelEnvTarget}</strong> environment.
+                  </p>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowConfigModal(false);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-700 text-gray-300 hover:bg-gray-800 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!selectedVercelIntegration) {
+                      toast.error('Please select a Vercel integration');
+                      return;
+                    }
+                    
+                    if (!selectedVercelProject) {
+                      toast.error('Please select a Vercel project');
+                      return;
+                    }
+                    
+                    if (!id || !env) {
+                      toast.error('Invalid project or environment');
+                      return;
+                    }
+                    
+                    try {
+                      setIsSavingConfig(true);
+                      
+                      const selectedProject = vercelProjects.find(p => p.id === selectedVercelProject);
+                      
+                      const data = await apiService.saveVercelSyncConfig({
+                        projectId: id,
+                        environment: env,
+                        folder: folder || 'default',
+                        vercelIntegrationId: selectedVercelIntegration,
+                        vercelProjectId: selectedVercelProject,
+                        vercelProjectName: selectedProject?.name,
+                        vercelEnvTarget,
+                      });
+                      
+                      if (data.success) {
+                        setShowConfigModal(false);
+                        // Refresh sync status
+                        await checkSyncStatus();
+                        // Show success message
+                        toast.success('Sync configuration saved successfully');
+                      } else {
+                        toast.error('Failed to save configuration');
+                      }
+                    } catch (e) {
+                      console.error('Failed to save sync config:', e);
+                      toast.error('Failed to save configuration. Please try again.');
+                    } finally {
+                      setIsSavingConfig(false);
+                    }
+                  }}
+                  disabled={!selectedVercelIntegration || !selectedVercelProject || isSavingConfig}
+                  className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSavingConfig ? 'Saving...' : 'Save Configuration'}
                 </button>
               </div>
             </div>
@@ -1659,6 +2096,7 @@ const breadcrumbItems = useMemo(() => {
           isLoading={false}
         />
       )}
+
     </div>
   );
 }

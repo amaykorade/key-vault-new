@@ -23,16 +23,11 @@ export interface VercelEnvVar {
 
 export class VercelService {
   /**
-   * Get Vercel access token for a user/organization
+   * Get Vercel access token for a specific integration
    */
-  static async getAccessToken(userId: string, organizationId: string): Promise<string | null> {
+  static async getAccessToken(integrationId: string): Promise<string | null> {
     const integration = await db.vercelIntegration.findUnique({
-      where: {
-        userId_organizationId: {
-          userId,
-          organizationId,
-        },
-      },
+      where: { id: integrationId },
     });
 
     if (!integration) return null;
@@ -42,39 +37,118 @@ export class VercelService {
   }
 
   /**
-   * Store Vercel OAuth access token
+   * Get Vercel access token for a user/organization (legacy - uses first integration)
+   */
+  static async getAccessTokenForOrg(userId: string, organizationId: string): Promise<string | null> {
+    const integration = await db.vercelIntegration.findFirst({
+      where: {
+        userId,
+        organizationId,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (!integration) return null;
+
+    // Decrypt the stored token
+    return decryptSecret(integration.vercelAccessToken);
+  }
+
+  /**
+   * List all Vercel integrations for a user/organization
+   */
+  static async listIntegrations(userId: string, organizationId: string): Promise<Array<{
+    id: string;
+    name: string;
+    vercelTeamId: string | null;
+    vercelTeamName: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }>> {
+    const integrations = await db.vercelIntegration.findMany({
+      where: {
+        userId,
+        organizationId,
+      },
+      select: {
+        id: true,
+        name: true,
+        vercelTeamId: true,
+        vercelTeamName: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return integrations;
+  }
+
+  /**
+   * Store Vercel OAuth access token (creates new integration)
    */
   static async storeAccessToken(
     userId: string,
     organizationId: string,
     accessToken: string,
+    name?: string,
     teamId?: string,
     teamName?: string
-  ): Promise<void> {
+  ): Promise<{ id: string; name: string }> {
     // Encrypt the token before storing
     const encryptedToken = encryptSecret(accessToken);
 
-    await db.vercelIntegration.upsert({
-      where: {
-        userId_organizationId: {
-          userId,
-          organizationId,
-        },
-      },
-      create: {
+    // Generate a default name if not provided
+    const integrationName = name || `Vercel ${new Date().toLocaleDateString()}`;
+
+    const integration = await db.vercelIntegration.create({
+      data: {
         userId,
         organizationId,
+        name: integrationName,
         vercelAccessToken: encryptedToken,
         vercelTeamId: teamId,
         vercelTeamName: teamName,
-      },
-      update: {
-        vercelAccessToken: encryptedToken,
-        vercelTeamId: teamId,
-        vercelTeamName: teamName,
-        updatedAt: new Date(),
       },
     });
+
+    return {
+      id: integration.id,
+      name: integration.name,
+    };
+  }
+
+  /**
+   * Delete a Vercel integration
+   */
+  static async deleteIntegration(integrationId: string, userId: string): Promise<void> {
+    // Verify the integration belongs to the user
+    const integration = await db.vercelIntegration.findUnique({
+      where: { id: integrationId },
+    });
+
+    if (!integration || integration.userId !== userId) {
+      throw new Error('Integration not found or access denied');
+    }
+
+    // Delete the integration (cascade will delete related syncs)
+    await db.vercelIntegration.delete({
+      where: { id: integrationId },
+    });
+  }
+
+  /**
+   * Check if user has any Vercel integration for an organization
+   */
+  static async isConnected(userId: string, organizationId: string): Promise<boolean> {
+    const count = await db.vercelIntegration.count({
+      where: {
+        userId,
+        organizationId,
+      },
+    });
+
+    return count > 0;
   }
 
   /**
@@ -222,7 +296,7 @@ export class VercelService {
    * Sync all secrets from a folder to a Vercel project
    */
   static async syncFolderToVercel(
-    userId: string,
+    vercelIntegrationId: string,
     projectId: string,
     environment: string,
     folder: string,
@@ -230,28 +304,18 @@ export class VercelService {
     vercelEnvTarget: 'production' | 'preview' | 'development'
   ): Promise<{ synced: number; errors: string[] }> {
     try {
-      // Get Vercel access token
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        select: { organizationId: true },
-      });
-
-      if (!project) throw new Error('Project not found');
-
-      const accessToken = await this.getAccessToken(userId, project.organizationId);
-      if (!accessToken) throw new Error('Vercel not connected');
+      // Get Vercel access token from integration
+      const accessToken = await this.getAccessToken(vercelIntegrationId);
+      if (!accessToken) throw new Error('Vercel integration not found or invalid');
 
       // Get the integration to check for team ID
       const integration = await db.vercelIntegration.findUnique({
-        where: {
-          userId_organizationId: {
-            userId,
-            organizationId: project.organizationId,
-          },
-        },
+        where: { id: vercelIntegrationId },
       });
 
-      const teamId = integration?.vercelTeamId || undefined;
+      if (!integration) throw new Error('Vercel integration not found');
+
+      const teamId = integration.vercelTeamId || undefined;
 
       // Fetch all secrets from the folder
       const secrets = await db.secret.findMany({
@@ -321,6 +385,7 @@ export class VercelService {
           projectId,
           environment,
           folder,
+          vercelIntegrationId,
           vercelProjectId,
           vercelEnvTarget,
           lastSyncedAt: new Date(),
@@ -328,6 +393,9 @@ export class VercelService {
           lastSyncError: errors.length > 0 ? errors.join('; ') : null,
         },
         update: {
+          vercelIntegrationId,
+          vercelProjectId,
+          vercelEnvTarget,
           lastSyncedAt: new Date(),
           lastSyncStatus: errors.length > 0 ? 'failed' : 'success',
           lastSyncError: errors.length > 0 ? errors.join('; ') : null,
@@ -356,35 +424,6 @@ export class VercelService {
     });
   }
 
-  /**
-   * Disconnect Vercel integration
-   */
-  static async disconnect(userId: string, organizationId: string): Promise<void> {
-    await db.vercelIntegration.delete({
-      where: {
-        userId_organizationId: {
-          userId,
-          organizationId,
-        },
-      },
-    });
-  }
-
-  /**
-   * Check if Vercel is connected for a user/organization
-   */
-  static async isConnected(userId: string, organizationId: string): Promise<boolean> {
-    const integration = await db.vercelIntegration.findUnique({
-      where: {
-        userId_organizationId: {
-          userId,
-          organizationId,
-        },
-      },
-    });
-
-    return !!integration;
-  }
 
   /**
    * Check if a folder has unsynced changes

@@ -635,14 +635,56 @@ class ApiService {
     return this.request<{ connected: boolean }>(`/vercel/status/${organizationId}`);
   }
 
-  async getVercelProjects(organizationId: string): Promise<{ projects: any[] }> {
-    return this.request<{ projects: any[] }>(`/vercel/projects/${organizationId}`);
+  async getVercelIntegrations(organizationId: string): Promise<{
+    integrations: Array<{
+      id: string;
+      name: string;
+      vercelTeamId: string | null;
+      vercelTeamName: string | null;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+  }> {
+    return this.request<{
+      integrations: Array<{
+        id: string;
+        name: string;
+        vercelTeamId: string | null;
+        vercelTeamName: string | null;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+    }>(`/vercel/integrations/${organizationId}`);
   }
 
-  async connectVercel(data: { accessToken: string; organizationId: string; teamId?: string; teamName?: string }): Promise<{ success: boolean; message?: string }> {
-    return this.request<{ success: boolean; message?: string }>('/vercel/connect', {
+  async getVercelProjects(integrationId: string): Promise<{ projects: any[] }> {
+    return this.request<{ projects: any[] }>(`/vercel/projects/${integrationId}`);
+  }
+
+  async connectVercel(data: { 
+    accessToken: string; 
+    organizationId: string; 
+    name?: string;
+    teamId?: string; 
+    teamName?: string 
+  }): Promise<{ 
+    success: boolean; 
+    message?: string;
+    integration?: { id: string; name: string };
+  }> {
+    return this.request<{ 
+      success: boolean; 
+      message?: string;
+      integration?: { id: string; name: string };
+    }>('/vercel/connect', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  }
+
+  async deleteVercelIntegration(integrationId: string): Promise<{ success: boolean; message?: string }> {
+    return this.request<{ success: boolean; message?: string }>(`/vercel/integrations/${integrationId}`, {
+      method: 'DELETE',
     });
   }
 
@@ -650,6 +692,7 @@ class ApiService {
     projectId: string;
     environment: string;
     folder: string;
+    vercelIntegrationId: string;
     vercelProjectId: string;
     vercelProjectName?: string;
     vercelEnvTarget: 'production' | 'preview' | 'development';
@@ -662,6 +705,71 @@ class ApiService {
 
   async checkVercelSyncStatus(projectId: string, environment: string, folder: string): Promise<{ hasUnsyncedChanges: boolean }> {
     return this.request<{ hasUnsyncedChanges: boolean }>(`/vercel/sync-status/${projectId}/${environment}/${folder}`);
+  }
+
+  async getVercelSyncConfig(projectId: string, environment: string, folder: string): Promise<{
+    config: {
+      vercelIntegrationId: string | null;
+      vercelProjectId: string;
+      vercelProjectName: string | null;
+      vercelEnvTarget: 'production' | 'preview' | 'development';
+      syncEnabled: boolean;
+      autoSync: boolean;
+      lastSyncedAt: string | null;
+      lastSyncStatus: string | null;
+      lastSyncError: string | null;
+    } | null;
+  }> {
+    return this.request<{
+      config: {
+        vercelIntegrationId: string | null;
+        vercelProjectId: string;
+        vercelProjectName: string | null;
+        vercelEnvTarget: 'production' | 'preview' | 'development';
+        syncEnabled: boolean;
+        autoSync: boolean;
+        lastSyncedAt: string | null;
+        lastSyncStatus: string | null;
+        lastSyncError: string | null;
+      } | null;
+    }>(`/vercel/sync-config/${projectId}/${environment}/${folder}`);
+  }
+
+  async saveVercelSyncConfig(data: {
+    projectId: string;
+    environment: string;
+    folder: string;
+    vercelIntegrationId: string;
+    vercelProjectId: string;
+    vercelProjectName?: string;
+    vercelEnvTarget: 'production' | 'preview' | 'development';
+    syncEnabled?: boolean;
+    autoSync?: boolean;
+  }): Promise<{
+    success: boolean;
+    config: {
+      vercelIntegrationId: string | null;
+      vercelProjectId: string;
+      vercelProjectName: string | null;
+      vercelEnvTarget: 'production' | 'preview' | 'development';
+      syncEnabled: boolean;
+      autoSync: boolean;
+    };
+  }> {
+    return this.request<{
+      success: boolean;
+      config: {
+        vercelIntegrationId: string | null;
+        vercelProjectId: string;
+        vercelProjectName: string | null;
+        vercelEnvTarget: 'production' | 'preview' | 'development';
+        syncEnabled: boolean;
+        autoSync: boolean;
+      };
+    }>('/vercel/sync-config', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 
   async getVercelAuthUrl(organizationId: string, returnTo?: string): Promise<{ authUrl: string }> {
