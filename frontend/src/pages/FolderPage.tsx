@@ -1306,7 +1306,7 @@ const breadcrumbItems = useMemo(() => {
                             // Use first project if none selected
                             const projectToSync = selectedVercelProject || vercelProjects[0]?.id;
                             
-                            if (!id || !projectToSync) {
+                            if (!id || !env || !projectToSync) {
                               alert('Please configure the sync first by clicking "Configure"');
                               return;
                             }
