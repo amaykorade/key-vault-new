@@ -20,6 +20,10 @@ import { CliAuthPage } from './pages/CliAuthPage';
 import { CliGuidePage } from './pages/CliGuidePage';
 import { BillingPage } from './pages/BillingPage';
 import { LandingPage } from './pages/LandingPage';
+import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
+import { RefundPolicyPage } from './pages/RefundPolicyPage';
+import { TermsOfServicePage } from './pages/TermsOfServicePage';
+import { PricingPage } from './pages/PricingPage';
 import { AppLayout } from './components/layout/AppLayout';
 
 function App() {
@@ -46,6 +50,10 @@ function App() {
           />
 
           <Route path={ROUTES.LANDING} element={<LandingPage />} />
+          <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/refund" element={<RefundPolicyPage />} />
+          <Route path="/terms" element={<TermsOfServicePage />} />
 
           {/* Protected routes */}
           <Route

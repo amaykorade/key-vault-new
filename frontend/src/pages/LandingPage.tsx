@@ -1,6 +1,7 @@
 import { FormEvent, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiService, ApiError } from '../services/api';
+import { ROUTES } from '../constants';
 
 const sectionSpacing = 'max-w-6xl mx-auto px-4 sm:px-6 lg:px-8';
 
@@ -431,6 +432,62 @@ export function LandingPage() {
           </div>
         </section>
       </main>
+
+      <footer className="border-t border-gray-800 bg-gray-950/50 mt-20">
+        <div className={`max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12`}>
+          <div className="grid gap-8 md:grid-cols-4">
+            <div>
+              <h3 className="text-white font-semibold mb-4">APIVault</h3>
+              <p className="text-sm text-gray-400">
+                Never commit an API key again. Secure secrets management for developers.
+              </p>
+            </div>
+            <div>
+              <h4 className="text-white font-semibold mb-4">Product</h4>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <Link to="/pricing" className="text-gray-400 hover:text-emerald-400 transition">
+                    Pricing
+                  </Link>
+                </li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="text-white font-semibold mb-4">Legal</h4>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <Link to="/privacy" className="text-gray-400 hover:text-emerald-400 transition">
+                    Privacy Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/terms" className="text-gray-400 hover:text-emerald-400 transition">
+                    Terms of Service
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/refund" className="text-gray-400 hover:text-emerald-400 transition">
+                    Refund Policy
+                  </Link>
+                </li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="text-white font-semibold mb-4">Contact</h4>
+              <ul className="space-y-2 text-sm text-gray-400">
+                <li>
+                  <a href="mailto:contact@apivault.it.com" className="hover:text-emerald-400 transition">
+                    contact@apivault.it.com
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div className="mt-8 pt-8 border-t border-gray-800 text-center text-sm text-gray-400">
+            <p>&copy; {new Date().getFullYear()} APIVault. All rights reserved.</p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
