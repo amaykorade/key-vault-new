@@ -32,7 +32,7 @@ function getEventIcon(_eventType: string, action: string) {
     return <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>;
   }
   if (action === 'update') {
-    return <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>;
+    return <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>;
   }
   if (action === 'delete') {
     return <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
@@ -45,7 +45,7 @@ function getEventIcon(_eventType: string, action: string) {
 
 function getEventColor(action: string) {
   if (action === 'create') return { bg: 'bg-emerald-500/20', badge: 'bg-emerald-500/20 text-emerald-400' };
-  if (action === 'update') return { bg: 'bg-blue-500/20', badge: 'bg-blue-500/20 text-blue-400' };
+  if (action === 'update') return { bg: 'bg-emerald-500/20', badge: 'bg-emerald-500/20 text-emerald-400' };
   if (action === 'delete') return { bg: 'bg-red-500/20', badge: 'bg-red-500/20 text-red-400' };
   if (action === 'view') return { bg: 'bg-gray-700/30', badge: 'bg-gray-700/30 text-gray-400' };
   return { bg: 'bg-gray-700/30', badge: 'bg-gray-700/30 text-gray-400' };
@@ -1630,13 +1630,13 @@ const breadcrumbItems = useMemo(() => {
               </div>
 
               {/* Important Note */}
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-4">
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 mb-4">
                 <div className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <div>
-                    <h4 className="text-sm font-semibold text-blue-400 mb-1">⚠️ Redeploy Required</h4>
+                    <h4 className="text-sm font-semibold text-emerald-400 mb-1">⚠️ Redeploy Required</h4>
                     <p className="text-xs text-gray-300 leading-relaxed mb-2">
                       Environment variables have been updated in Vercel. To apply these changes to your live site, you need to <strong className="text-white">redeploy from your Vercel dashboard</strong>.
                     </p>
@@ -1683,8 +1683,8 @@ const breadcrumbItems = useMemo(() => {
           <div className="w-full max-w-2xl bg-gray-900 rounded-xl border border-gray-700 shadow-2xl animate-slide-up">
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-xl flex items-center justify-center">
-                  <svg className="w-6 h-6 text-blue-400" viewBox="0 0 24 24" fill="currentColor">
+                <div className="w-12 h-12 bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 rounded-xl flex items-center justify-center">
+                  <svg className="w-6 h-6 text-emerald-400" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 2L2 22h20L12 2z" />
                   </svg>
                 </div>
@@ -1695,11 +1695,11 @@ const breadcrumbItems = useMemo(() => {
               </div>
 
               {/* Instructions */}
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-4">
-                <h4 className="text-sm font-semibold text-blue-400 mb-2">How to get your Vercel token:</h4>
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 mb-4">
+                <h4 className="text-sm font-semibold text-emerald-400 mb-2">How to get your Vercel token:</h4>
                 <ol className="space-y-2 text-sm text-gray-300">
                   <li className="flex items-start gap-2">
-                    <span className="text-blue-400 font-bold">1.</span>
+                    <span className="text-emerald-400 font-bold">1.</span>
                     <span>
                       Go to{' '}
                       <a 
@@ -1713,18 +1713,18 @@ const breadcrumbItems = useMemo(() => {
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-blue-400 font-bold">2.</span>
+                    <span className="text-emerald-400 font-bold">2.</span>
                     <span>Click <strong>"Create Token"</strong></span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-blue-400 font-bold">3.</span>
+                    <span className="text-emerald-400 font-bold">3.</span>
                     <span>
                       Give it a name (e.g., "Key Vault Sync") and select scope:{' '}
                       <strong className="text-white">Full Access</strong> or specific projects
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-blue-400 font-bold">4.</span>
+                    <span className="text-emerald-400 font-bold">4.</span>
                     <span>Copy the token and paste it below</span>
                   </li>
                 </ol>
@@ -1882,8 +1882,8 @@ const breadcrumbItems = useMemo(() => {
           <div className="w-full max-w-2xl bg-gray-900 rounded-xl border border-gray-700 shadow-2xl animate-slide-up">
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-xl flex items-center justify-center">
-                  <svg className="w-6 h-6 text-blue-400" viewBox="0 0 24 24" fill="currentColor">
+                <div className="w-12 h-12 bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 rounded-xl flex items-center justify-center">
+                  <svg className="w-6 h-6 text-emerald-400" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 2L2 22h20L12 2z" />
                   </svg>
                 </div>
@@ -1973,13 +1973,13 @@ const breadcrumbItems = useMemo(() => {
               </div>
 
               {/* Info Box */}
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4">
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 mb-4">
                 <div className="flex items-start gap-2">
-                  <svg className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <p className="text-xs text-gray-300">
-                    <strong className="text-blue-400">Sync Mapping:</strong> This folder ({folder || 'default'}) in {environmentLabel} environment will sync to{' '}
+                    <strong className="text-emerald-400">Sync Mapping:</strong> This folder ({folder || 'default'}) in {environmentLabel} environment will sync to{' '}
                     <strong className="text-white">
                       {selectedVercelIntegration ? vercelIntegrations.find(i => i.id === selectedVercelIntegration)?.name || 'selected integration' : 'selected integration'}
                     </strong>

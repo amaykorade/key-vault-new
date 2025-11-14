@@ -92,7 +92,7 @@ export function BillingPage() {
               Cancel or upgrade anytime directly inside Key Vault.
             </div>
             <div className="flex items-center gap-2">
-              <span className="flex h-2 w-2 rounded-full bg-blue-400" aria-hidden />
+              <span className="flex h-2 w-2 rounded-full bg-emerald-400" aria-hidden />
               Annual billing saves 25% on the Starter plan.
             </div>
           </div>

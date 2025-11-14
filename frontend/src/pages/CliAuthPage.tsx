@@ -128,7 +128,7 @@ export function CliAuthPage() {
 
   if (!userCode) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
         <Card className="max-w-md w-full">
           <CardHeader>
             <CardTitle className="text-white">Invalid Authorization Request</CardTitle>
@@ -143,7 +143,7 @@ export function CliAuthPage() {
 
   if (status === 'unauthorized') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
         <Card className="max-w-md w-full">
           <CardHeader>
             <CardTitle className="text-white">Login Required</CardTitle>
@@ -166,7 +166,7 @@ export function CliAuthPage() {
 
   if (status === 'success') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
         <Card className="max-w-md w-full border-emerald-500/50">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
@@ -196,7 +196,7 @@ export function CliAuthPage() {
 
   if (status === 'error') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
         <Card className="max-w-md w-full border-red-500/50">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
@@ -221,7 +221,7 @@ export function CliAuthPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 p-4">
       <Card className="max-w-md w-full">
         <CardHeader>
           <CardTitle className="text-white">Authorize CLI Device</CardTitle>
@@ -243,7 +243,7 @@ export function CliAuthPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-400">Authorization Code</span>
-                <code className="px-2 py-1 bg-gray-900 text-emerald-400 font-mono text-sm rounded">
+                <code className="px-2 py-1 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-emerald-400 font-mono text-sm rounded">
                   {userCode}
                 </code>
               </div>
@@ -265,7 +265,7 @@ export function CliAuthPage() {
               value={tokenName}
               onChange={(e) => setTokenName(e.target.value)}
               placeholder="e.g., MacBook Pro, CI/CD Pipeline"
-              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full px-4 py-2 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
             <p className="text-xs text-gray-500 mt-1">
               Give this CLI token a descriptive name to identify it later

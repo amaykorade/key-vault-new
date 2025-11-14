@@ -101,7 +101,7 @@ export function SecretForm({
   };
 
   return (
-    <Card className="w-full max-w-2xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-700 shadow-2xl">
+    <Card className="w-full max-w-2xl bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 border border-gray-700 shadow-2xl">
       <CardHeader className="border-b border-gray-700 pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">

@@ -66,7 +66,7 @@ export function OrganizationsPage() {
 
       {showCreate && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-xl shadow-2xl border border-gray-700 w-full max-w-xl">
+          <div className="bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 rounded-xl shadow-2xl border border-gray-700 w-full max-w-xl">
             {/* Header */}
             <div className="p-6 border-b border-gray-700 flex items-center justify-between">
               <div className="flex items-center space-x-3">

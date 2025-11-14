@@ -55,7 +55,7 @@ export function ConfirmDeleteModal({
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
-      <div className={`bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-xl shadow-2xl border border-gray-700 p-8 w-full max-w-lg mx-4 animate-slide-up ${className}`}>
+      <div className={`bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 rounded-xl shadow-2xl border border-gray-700 p-8 w-full max-w-lg mx-4 animate-slide-up ${className}`}>
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
