@@ -75,24 +75,24 @@ export function SignupPage() {
 
   const passwordStrength = getPasswordStrength(password);
   const strengthLabels = ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong'];
-  const strengthColors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-blue-500', 'bg-green-500'];
+  const strengthColors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-blue-500', 'bg-emerald-500'];
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 animate-fade-in">
         {/* Header */}
         <div className="text-center">
           <h2 className="text-3xl font-bold text-white mb-2">
-            Join Key Vault
+            Create your account
           </h2>
-          <p className="text-gray-400">
-            Create your secure account today
+          <p className="text-gray-300">
+            Start securing your secrets today
           </p>
-          <p className="mt-4 text-sm text-gray-500">
+          <p className="mt-4 text-sm text-gray-400">
             Already have an account?{' '}
             <Link
               to={ROUTES.LOGIN}
-              className="font-medium text-blue-400 hover:text-blue-300 transition-colors duration-200"
+              className="font-medium text-emerald-400 hover:text-emerald-300 transition-colors duration-200"
             >
               Sign in here
             </Link>
@@ -100,22 +100,22 @@ export function SignupPage() {
         </div>
 
         {/* Signup Form */}
-        <Card className="hover-lift">
-          <CardHeader>
+        <Card className="border-gray-800 bg-gray-900/70 backdrop-blur-sm">
+          <CardHeader className="border-b border-gray-800">
             <CardTitle className="text-white">Create Account</CardTitle>
-            <CardDescription>
-              Start securing your secrets with our enterprise-grade vault
+            <CardDescription className="text-gray-400">
+              Get started with secure secret management
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               {error && (
-                <div className="bg-red-900/20 border border-red-500/20 rounded-lg p-4">
+                <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4">
                   <div className="flex items-center">
-                    <svg className="w-5 h-5 text-red-400 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-5 h-5 text-red-400 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                     </svg>
-                    <div className="text-sm text-red-400">
+                    <div className="text-sm text-red-300">
                       {error === 'User already exists' ? ERROR_MESSAGES.EMAIL_ALREADY_EXISTS : error}
                     </div>
                   </div>
@@ -179,7 +179,7 @@ export function SignupPage() {
                           passwordStrength < 2 ? 'text-red-400' :
                           passwordStrength < 3 ? 'text-orange-400' :
                           passwordStrength < 4 ? 'text-yellow-400' :
-                          passwordStrength < 5 ? 'text-blue-400' : 'text-green-400'
+                          passwordStrength < 5 ? 'text-blue-400' : 'text-emerald-400'
                         }`}>
                           {passwordStrength > 0 ? strengthLabels[passwordStrength - 1] : 'Very Weak'}
                         </span>
@@ -231,8 +231,7 @@ export function SignupPage() {
 
               <Button
                 type="submit"
-                variant="gradient"
-                className="w-full shadow-lg"
+                className="w-full bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg transition-colors"
                 loading={isLoading}
                 disabled={isLoading}
               >
@@ -241,17 +240,16 @@ export function SignupPage() {
 
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-700"></div>
+                  <div className="w-full border-t border-gray-800"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="bg-gray-900 px-4 text-gray-400">Or continue with</span>
+                  <span className="bg-gray-900/70 px-4 text-gray-400">Or continue with</span>
                 </div>
               </div>
 
               <Button 
                 type="button" 
-                variant="outline" 
-                className="w-full" 
+                className="w-full border border-gray-700 bg-gray-900 text-gray-200 hover:border-emerald-500/40 hover:text-white transition-colors" 
                 onClick={onGoogleSignup}
               >
                 <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
@@ -267,8 +265,17 @@ export function SignupPage() {
         </Card>
 
         {/* Footer */}
-        <div className="text-center text-sm text-gray-500">
-          <p>By creating an account, you agree to our Terms of Service and Privacy Policy</p>
+        <div className="text-center text-sm text-gray-400">
+          <p>
+            By creating an account, you agree to our{' '}
+            <Link to="/terms" className="text-emerald-400 hover:text-emerald-300 transition-colors">
+              Terms of Service
+            </Link>
+            {' '}and{' '}
+            <Link to="/privacy" className="text-emerald-400 hover:text-emerald-300 transition-colors">
+              Privacy Policy
+            </Link>
+          </p>
         </div>
       </div>
     </div>
