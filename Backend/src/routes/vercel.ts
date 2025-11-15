@@ -205,7 +205,38 @@ router.get('/projects/:integrationId', requireAuth, async (req: AuthRequest, res
 router.delete('/integrations/:integrationId', requireAuth, async (req: AuthRequest, res) => {
   try {
     const { integrationId } = req.params;
-    await VercelService.deleteIntegration(integrationId, req.user!.id);
+    const deletedSyncs = await VercelService.deleteIntegration(integrationId, req.user!.id);
+    
+    // Log deletion of each sync configuration
+    const ipAddress = req.ip || req.connection?.remoteAddress;
+    const AuditService = require('../services/audit').AuditService;
+    
+    for (const sync of deletedSyncs) {
+      // Get project to find organizationId
+      const project = await require('../lib/db').db.project.findUnique({
+        where: { id: sync.projectId },
+        select: { organizationId: true },
+      });
+      
+      await AuditService.log({
+        userId: req.user!.id,
+        projectId: sync.projectId,
+        organizationId: project?.organizationId,
+        eventType: 'vercel_sync',
+        action: 'delete',
+        resourceName: `Vercel Sync: ${sync.vercelProjectName || 'Unknown Project'}`,
+        resourceType: 'integration',
+        environment: sync.environment,
+        folder: sync.folder,
+        metadata: {
+          vercelProjectName: sync.vercelProjectName,
+          integrationId,
+        },
+        description: `User deleted Vercel sync configuration for project "${sync.vercelProjectName}" in ${sync.environment}/${sync.folder}`,
+        ipAddress,
+      }).catch(console.error);
+    }
+    
     res.json({ success: true, message: 'Vercel integration deleted successfully' });
   } catch (error: any) {
     console.error('Failed to delete Vercel integration:', error);
@@ -458,6 +489,62 @@ router.post('/sync-config', requireAuth, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: 'Invalid request data' });
     }
     res.status(500).json({ error: error.message || 'Failed to save sync configuration' });
+  }
+});
+
+/**
+ * DELETE /vercel/sync-config/:projectId/:environment/:folder
+ * Delete a sync configuration for a specific folder
+ */
+router.delete('/sync-config/:projectId/:environment/:folder', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { projectId, environment, folder } = req.params;
+    
+    // Verify user has access to the project
+    const project = await require('../lib/db').db.project.findUnique({
+      where: { id: projectId },
+      include: { members: true },
+    });
+
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    const hasAccess = project.members.some((m: { userId: string }) => m.userId === req.user!.id);
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const deleted = await VercelService.deleteSyncConfig(projectId, decodeURIComponent(environment), decodeURIComponent(folder), req.user!.id);
+    
+    // Log the deletion
+    const ipAddress = req.ip || req.connection?.remoteAddress;
+    const AuditService = require('../services/audit').AuditService;
+    
+    await AuditService.log({
+      userId: req.user!.id,
+      projectId: deleted.projectId,
+      organizationId: project.organizationId,
+      eventType: 'vercel_sync',
+      action: 'delete',
+      resourceName: `Vercel Sync: ${deleted.vercelProjectName || 'Unknown Project'}`,
+      resourceType: 'integration',
+      environment: deleted.environment,
+      folder: deleted.folder,
+      metadata: {
+        vercelProjectName: deleted.vercelProjectName,
+      },
+      description: `User deleted Vercel sync configuration for project "${deleted.vercelProjectName}" in ${deleted.environment}/${deleted.folder}`,
+      ipAddress,
+    }).catch(console.error);
+    
+    res.json({ success: true, message: 'Sync configuration deleted successfully' });
+  } catch (error: any) {
+    console.error('Failed to delete sync config:', error);
+    if (error.message === 'Sync configuration not found' || error.message === 'Access denied to this sync configuration') {
+      return res.status(403).json({ error: error.message });
+    }
+    res.status(500).json({ error: error.message || 'Failed to delete sync configuration' });
   }
 });
 

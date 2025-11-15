@@ -121,20 +121,33 @@ export class VercelService {
   /**
    * Delete a Vercel integration
    */
-  static async deleteIntegration(integrationId: string, userId: string): Promise<void> {
+  static async deleteIntegration(integrationId: string, userId: string): Promise<Array<{ projectId: string; environment: string; folder: string; vercelProjectName: string | null }>> {
     // Verify the integration belongs to the user
     const integration = await db.vercelIntegration.findUnique({
       where: { id: integrationId },
+      include: {
+        syncs: true, // Get all related sync configs before deletion
+      },
     });
 
     if (!integration || integration.userId !== userId) {
       throw new Error('Integration not found or access denied');
     }
 
+    // Collect sync config info before deletion for audit logging
+    const deletedSyncs = integration.syncs.map((sync) => ({
+      projectId: sync.projectId,
+      environment: sync.environment,
+      folder: sync.folder,
+      vercelProjectName: sync.vercelProjectName,
+    }));
+
     // Delete the integration (cascade will delete related syncs)
     await db.vercelIntegration.delete({
       where: { id: integrationId },
     });
+
+    return deletedSyncs;
   }
 
   /**
@@ -422,6 +435,52 @@ export class VercelService {
         },
       },
     });
+  }
+
+  /**
+   * Delete a sync configuration for a specific folder
+   */
+  static async deleteSyncConfig(projectId: string, environment: string, folder: string, userId: string) {
+    // Verify the sync config exists and user has access
+    const syncConfig = await db.folderVercelSync.findUnique({
+      where: {
+        projectId_environment_folder: {
+          projectId,
+          environment,
+          folder,
+        },
+      },
+      include: {
+        vercelIntegration: true,
+      },
+    });
+
+    if (!syncConfig) {
+      throw new Error('Sync configuration not found');
+    }
+
+    // Verify the integration belongs to the user
+    if (!syncConfig.vercelIntegration || syncConfig.vercelIntegration.userId !== userId) {
+      throw new Error('Access denied to this sync configuration');
+    }
+
+    // Delete the sync configuration
+    const deleted = await db.folderVercelSync.delete({
+      where: {
+        projectId_environment_folder: {
+          projectId,
+          environment,
+          folder,
+        },
+      },
+    });
+
+    return {
+      projectId: deleted.projectId,
+      environment: deleted.environment,
+      folder: deleted.folder,
+      vercelProjectName: deleted.vercelProjectName,
+    };
   }
 
 

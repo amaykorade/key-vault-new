@@ -772,6 +772,15 @@ class ApiService {
     });
   }
 
+  async deleteVercelSyncConfig(projectId: string, environment: string, folder: string): Promise<{ success: boolean; message?: string }> {
+    return this.request<{ success: boolean; message?: string }>(
+      `/vercel/sync-config/${projectId}/${encodeURIComponent(environment)}/${encodeURIComponent(folder)}`,
+      {
+        method: 'DELETE',
+      }
+    );
+  }
+
   async getVercelAuthUrl(organizationId: string, returnTo?: string): Promise<{ authUrl: string }> {
     const params = new URLSearchParams();
     if (organizationId) params.append('organizationId', organizationId);

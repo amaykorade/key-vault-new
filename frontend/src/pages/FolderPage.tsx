@@ -27,7 +27,14 @@ function getTimeAgo(dateString: string): string {
   return date.toLocaleDateString();
 }
 
-function getEventIcon(_eventType: string, action: string) {
+function getEventIcon(eventType: string, action: string) {
+  // Vercel sync events
+  if (eventType === 'vercel_sync') {
+    if (action === 'failed') {
+      return <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>;
+    }
+    return <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>;
+  }
   if (action === 'create') {
     return <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>;
   }
@@ -40,6 +47,9 @@ function getEventIcon(_eventType: string, action: string) {
   if (action === 'view') {
     return <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>;
   }
+  if (action === 'failed') {
+    return <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>;
+  }
   return <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
 }
 
@@ -48,6 +58,7 @@ function getEventColor(action: string) {
   if (action === 'update') return { bg: 'bg-emerald-500/20', badge: 'bg-emerald-500/20 text-emerald-400' };
   if (action === 'delete') return { bg: 'bg-red-500/20', badge: 'bg-red-500/20 text-red-400' };
   if (action === 'view') return { bg: 'bg-gray-700/30', badge: 'bg-gray-700/30 text-gray-400' };
+  if (action === 'failed') return { bg: 'bg-red-500/20', badge: 'bg-red-500/20 text-red-400' };
   return { bg: 'bg-gray-700/30', badge: 'bg-gray-700/30 text-gray-400' };
 }
 
@@ -64,12 +75,14 @@ export function FolderPage() {
   const [showSecretModal, setShowSecretModal] = useState(false);
   const [showDeleteSecretModal, setShowDeleteSecretModal] = useState(false);
   const [secretToDelete, setSecretToDelete] = useState<Secret | null>(null);
+  const [isDeletingSecret, setIsDeletingSecret] = useState(false);
   const [isGeneratingToken, setIsGeneratingToken] = useState(false);
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
   const [tokensLoading, setTokensLoading] = useState(false);
   const [tokens, setTokens] = useState<Array<{ id: string; name: string; createdAt: string; expiresAt?: string | null; lastUsedAt?: string | null; projectId?: string | null; projectName?: string | null; scopes?: string[] }>>([]);
   const [tokenToRevoke, setTokenToRevoke] = useState<{ id: string; name: string } | null>(null);
   const [showRevokeConfirmation, setShowRevokeConfirmation] = useState(false);
+  const [isRevokingToken, setIsRevokingToken] = useState(false);
 
   async function fetchTokens() {
     try {
@@ -205,6 +218,7 @@ export function FolderPage() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [isDeletingIntegration, setIsDeletingIntegration] = useState<string | null>(null);
+  const [isDeletingSyncConfig, setIsDeletingSyncConfig] = useState(false);
   const [showSyncSuccessModal, setShowSyncSuccessModal] = useState(false);
   const [syncResult, setSyncResult] = useState<{ synced: number; projectName: string; envTarget: string } | null>(null);
   const [isTriggeringDeploy, setIsTriggeringDeploy] = useState(false);
@@ -484,15 +498,23 @@ const breadcrumbItems = useMemo(() => {
   }
 
   async function handleConfirmDelete() {
-    if (!secretToDelete) return;
-    await apiService.deleteSecret(secretToDelete.id);
-    await fetchSecrets();
-    setShowDeleteSecretModal(false);
-    setSecretToDelete(null);
-    
-    // Check sync status after deleting secret (small delay to ensure DB commit)
-    if (vercelConnected) {
-      setTimeout(() => checkSyncStatus(), 100);
+    if (!secretToDelete || isDeletingSecret) return;
+    try {
+      setIsDeletingSecret(true);
+      await apiService.deleteSecret(secretToDelete.id);
+      await fetchSecrets();
+      setShowDeleteSecretModal(false);
+      setSecretToDelete(null);
+      
+      // Check sync status after deleting secret (small delay to ensure DB commit)
+      if (vercelConnected) {
+        setTimeout(() => checkSyncStatus(), 100);
+      }
+    } catch (error) {
+      console.error('Failed to delete secret:', error);
+      toast.error('Failed to delete secret. Please try again.');
+    } finally {
+      setIsDeletingSecret(false);
     }
   }
 
@@ -958,27 +980,46 @@ const breadcrumbItems = useMemo(() => {
               <div className="flex gap-3">
                 <button
                   onClick={() => {
-                    setShowRevokeConfirmation(false);
-                    setTokenToRevoke(null);
+                    if (!isRevokingToken) {
+                      setShowRevokeConfirmation(false);
+                      setTokenToRevoke(null);
+                    }
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-700 text-gray-300 hover:bg-gray-800 rounded-lg transition-colors"
+                  disabled={isRevokingToken}
+                  className="flex-1 px-4 py-2 border border-gray-700 text-gray-300 hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={async () => {
+                    if (isRevokingToken) return;
                     try {
+                      setIsRevokingToken(true);
                       await apiService.revokeToken(tokenToRevoke.id);
                       await fetchTokens();
                       setShowRevokeConfirmation(false);
                       setTokenToRevoke(null);
+                      toast.success('Token revoked successfully');
                     } catch (e) {
                       console.error('Failed to revoke token:', e);
+                      toast.error('Failed to revoke token. Please try again.');
+                    } finally {
+                      setIsRevokingToken(false);
                     }
                   }}
-                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors"
+                  disabled={isRevokingToken}
+                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  Revoke Token
+                  {isRevokingToken ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Revoking...
+                    </>
+                  ) : (
+                    'Revoke Token'
+                  )}
                 </button>
               </div>
             </div>
@@ -1372,114 +1413,181 @@ const breadcrumbItems = useMemo(() => {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={async () => {
-                            // Load saved configuration before opening modal
-                            if (id && env && folder) {
-                              try {
-                                const configData = await apiService.getVercelSyncConfig(id, env, folder || 'default');
-                                if (configData.config) {
-                                  setSelectedVercelIntegration(configData.config.vercelIntegrationId || '');
-                                  setSelectedVercelProject(configData.config.vercelProjectId);
-                                  setVercelEnvTarget(configData.config.vercelEnvTarget);
-                                  
-                                  // Load projects for the selected integration
-                                  if (configData.config.vercelIntegrationId) {
-                                    await loadVercelProjects(configData.config.vercelIntegrationId);
+                        {selectedVercelIntegration && selectedVercelProject ? (
+                          <>
+                            <button
+                              onClick={async () => {
+                                if (!id || !env || !folder) {
+                                  toast.error('Invalid project, environment, or folder');
+                                  return;
+                                }
+                                
+                                try {
+                                  setIsDeletingSyncConfig(true);
+                                  await apiService.deleteVercelSyncConfig(id, env, folder || 'default');
+                                  // Clear sync configuration
+                                  setSelectedVercelIntegration('');
+                                  setSelectedVercelProject('');
+                                  setVercelProjects([]);
+                                  setVercelEnvTarget('development');
+                                  // Refresh sync status and logs
+                                  await checkSyncStatus();
+                                  await fetchLogs();
+                                  toast.success('Sync configuration deleted successfully');
+                                } catch (error) {
+                                  console.error('Failed to delete sync config:', error);
+                                  toast.error('Failed to delete sync configuration. Please try again.');
+                                } finally {
+                                  setIsDeletingSyncConfig(false);
+                                }
+                              }}
+                              disabled={isDeletingSyncConfig}
+                              className="px-3 py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Disconnect sync"
+                            >
+                              {isDeletingSyncConfig ? 'Disconnecting...' : 'Disconnect'}
+                            </button>
+                            <button
+                              onClick={async () => {
+                                // Load saved configuration before opening modal
+                                if (id && env && folder) {
+                                  try {
+                                    const configData = await apiService.getVercelSyncConfig(id, env, folder || 'default');
+                                    if (configData.config) {
+                                      setSelectedVercelIntegration(configData.config.vercelIntegrationId || '');
+                                      setSelectedVercelProject(configData.config.vercelProjectId);
+                                      setVercelEnvTarget(configData.config.vercelEnvTarget);
+                                      
+                                      // Load projects for the selected integration
+                                      if (configData.config.vercelIntegrationId) {
+                                        await loadVercelProjects(configData.config.vercelIntegrationId);
+                                      }
+                                    }
+                                  } catch (error) {
+                                    console.error('Failed to load sync config:', error);
                                   }
                                 }
-                              } catch (error) {
-                                console.error('Failed to load sync config:', error);
-                              }
-                            }
-                            // Open configuration modal
-                            setShowConfigModal(true);
-                          }}
-                          className="px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-800 rounded transition-colors"
-                          title="Configure sync"
-                        >
-                          Configure
-                        </button>
-                        <button
-                          onClick={async () => {
-                            if (!id || !env) {
-                              toast.error('Invalid project or environment');
-                              return;
-                            }
-                            
-                            // Check if configuration exists
-                            if (!selectedVercelIntegration) {
-                              toast.error('Please configure the sync first by clicking "Configure" to select a Vercel integration, project and environment.');
-                              setShowConfigModal(true);
-                              return;
-                            }
-                            
-                            if (!selectedVercelProject) {
-                              toast.error('Please configure the sync first by clicking "Configure" to select a Vercel project and environment.');
-                              setShowConfigModal(true);
-                              return;
-                            }
-                            
-                            try {
-                              setIsSyncing(true);
-                              
-                              const selectedProject = vercelProjects.find(p => p.id === selectedVercelProject);
-                              
-                              if (!selectedProject) {
-                                toast.error('Selected Vercel project not found. Please reconfigure.');
+                                // Open configuration modal
                                 setShowConfigModal(true);
-                                return;
-                              }
-                              
-                              const data = await apiService.syncToVercel({
-                                projectId: id,
-                                environment: env,
-                                folder: folder || 'default',
-                                vercelIntegrationId: selectedVercelIntegration,
-                                vercelProjectId: selectedVercelProject,
-                                vercelProjectName: selectedProject.name,
-                                vercelEnvTarget,
-                              });
-                              
-                              if (data.success) {
-                                if (data.errors && data.errors.length > 0) {
-                                  toast.error(`Synced ${data.synced} secret(s) with ${data.errors.length} error(s): ${data.errors.join(', ')}`, {
-                                    duration: 5000,
-                                  });
-                                } else {
-                                  setSyncResult({
-                                    synced: data.synced,
-                                    projectName: selectedProject?.name || 'Unknown Project',
-                                    envTarget: vercelEnvTarget,
-                                  });
-                                  setShowSyncSuccessModal(true);
-                                  setTimeout(() => checkSyncStatus(), 100);
+                              }}
+                              className="px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-800 rounded transition-colors"
+                              title="Configure sync"
+                            >
+                              Configure
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (!id || !env) {
+                                  toast.error('Invalid project or environment');
+                                  return;
                                 }
-                                await checkVercelConnection();
-                              } else {
-                                toast.error(`Sync failed: ${data.message || 'Unknown error'}`);
+                                
+                                // Check if configuration exists
+                                if (!selectedVercelIntegration) {
+                                  toast.error('Please configure the sync first by clicking "Configure" to select a Vercel integration, project and environment.');
+                                  setShowConfigModal(true);
+                                  return;
+                                }
+                                
+                                if (!selectedVercelProject) {
+                                  toast.error('Please configure the sync first by clicking "Configure" to select a Vercel project and environment.');
+                                  setShowConfigModal(true);
+                                  return;
+                                }
+                                
+                                try {
+                                  setIsSyncing(true);
+                                  
+                                  const selectedProject = vercelProjects.find(p => p.id === selectedVercelProject);
+                                  
+                                  if (!selectedProject) {
+                                    toast.error('Selected Vercel project not found. Please reconfigure.');
+                                    setShowConfigModal(true);
+                                    return;
+                                  }
+                                  
+                                  const data = await apiService.syncToVercel({
+                                    projectId: id,
+                                    environment: env,
+                                    folder: folder || 'default',
+                                    vercelIntegrationId: selectedVercelIntegration,
+                                    vercelProjectId: selectedVercelProject,
+                                    vercelProjectName: selectedProject.name,
+                                    vercelEnvTarget,
+                                  });
+                                  
+                                  if (data.success) {
+                                    if (data.errors && data.errors.length > 0) {
+                                      toast.error(`Synced ${data.synced} secret(s) with ${data.errors.length} error(s): ${data.errors.join(', ')}`, {
+                                        duration: 5000,
+                                      });
+                                    } else {
+                                      setSyncResult({
+                                        synced: data.synced,
+                                        projectName: selectedProject?.name || 'Unknown Project',
+                                        envTarget: vercelEnvTarget,
+                                      });
+                                      setShowSyncSuccessModal(true);
+                                      setTimeout(() => checkSyncStatus(), 100);
+                                    }
+                                    await checkVercelConnection();
+                                    // Refresh logs to show the sync event
+                                    await fetchLogs();
+                                  } else {
+                                    toast.error(`Sync failed: ${data.message || 'Unknown error'}`);
+                                  }
+                                } catch (e) {
+                                  console.error('Sync failed:', e);
+                                  toast.error('Failed to sync to Vercel. Please try again.');
+                                } finally {
+                                  setIsSyncing(false);
+                                }
+                              }}
+                              disabled={!selectedVercelIntegration || !selectedVercelProject || vercelProjects.length === 0 || isSyncing}
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {isSyncing ? (
+                                <span className="flex items-center gap-1.5">
+                                  <svg className="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                  </svg>
+                                  Syncing...
+                                </span>
+                              ) : (
+                                'Trigger Sync'
+                              )}
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={async () => {
+                              // Load saved configuration before opening modal
+                              if (id && env && folder) {
+                                try {
+                                  const configData = await apiService.getVercelSyncConfig(id, env, folder || 'default');
+                                  if (configData.config) {
+                                    setSelectedVercelIntegration(configData.config.vercelIntegrationId || '');
+                                    setSelectedVercelProject(configData.config.vercelProjectId);
+                                    setVercelEnvTarget(configData.config.vercelEnvTarget);
+                                    
+                                    // Load projects for the selected integration
+                                    if (configData.config.vercelIntegrationId) {
+                                      await loadVercelProjects(configData.config.vercelIntegrationId);
+                                    }
+                                  }
+                                } catch (error) {
+                                  console.error('Failed to load sync config:', error);
+                                }
                               }
-                            } catch (e) {
-                              console.error('Sync failed:', e);
-                              toast.error('Failed to sync to Vercel. Please try again.');
-                            } finally {
-                              setIsSyncing(false);
-                            }
-                          }}
-                          disabled={!selectedVercelIntegration || !selectedVercelProject || vercelProjects.length === 0 || isSyncing}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isSyncing ? (
-                            <span className="flex items-center gap-1.5">
-                              <svg className="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                              </svg>
-                              Syncing...
-                            </span>
-                          ) : (
-                            'Trigger Sync'
-                          )}
-                        </button>
+                              // Open configuration modal
+                              setShowConfigModal(true);
+                            }}
+                            className="px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-800 rounded transition-colors"
+                            title="Configure sync"
+                          >
+                            Configure
+                          </button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -1573,6 +1681,8 @@ const breadcrumbItems = useMemo(() => {
                                 setSelectedVercelProject('');
                                 setVercelProjects([]);
                               }
+                              // Refresh logs to show the deletion event
+                              await fetchLogs();
                               toast.success('Vercel integration deleted successfully');
                             } catch (error) {
                               console.error('Failed to delete integration:', error);
@@ -2087,13 +2197,13 @@ const breadcrumbItems = useMemo(() => {
       {showDeleteSecretModal && secretToDelete && (
         <ConfirmDeleteModal
           isOpen={showDeleteSecretModal}
-          onClose={() => { setShowDeleteSecretModal(false); setSecretToDelete(null); }}
+          onClose={() => { if (!isDeletingSecret) { setShowDeleteSecretModal(false); setSecretToDelete(null); } }}
           onConfirm={handleConfirmDelete}
           title="Delete Secret"
           itemName={secretToDelete.name}
           itemType="secret"
           description="This will permanently delete the secret. This action cannot be undone."
-          isLoading={false}
+          isLoading={isDeletingSecret}
         />
       )}
 
