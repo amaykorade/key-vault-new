@@ -1,11 +1,30 @@
 import { Link } from 'react-router-dom';
+import { SEO, getBreadcrumbSchema } from '../components/SEO';
+import { useEffect } from 'react';
+import { trackPageView } from '../components/GoogleAnalytics';
 
 export function PrivacyPolicyPage() {
   const sectionSpacing = 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12';
   const lastUpdated = 'November 11, 2025';
 
+  useEffect(() => {
+    trackPageView('/privacy');
+  }, []);
+
+  const breadcrumbSchema = getBreadcrumbSchema([
+    { name: 'Home', url: '/' },
+    { name: 'Privacy Policy', url: '/privacy' },
+  ]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-white">
+      <SEO
+        title="Privacy Policy - APIVault"
+        description="APIVault Privacy Policy. Learn how we collect, use, and protect your data. GDPR and CCPA compliant."
+        url="/privacy"
+        keywords="privacy policy, data protection, GDPR, CCPA, user privacy"
+        structuredData={breadcrumbSchema}
+      />
       <div className={sectionSpacing}>
         <div className="mb-8">
           <Link to="/" className="text-emerald-400 hover:text-emerald-300 text-sm mb-4 inline-block">

@@ -1,6 +1,9 @@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/Card';
 import { ROUTES } from '../constants';
 import { Link, useNavigate } from 'react-router-dom';
+import { SEO, getBreadcrumbSchema } from '../components/SEO';
+import { useEffect } from 'react';
+import { trackPageView } from '../components/GoogleAnalytics';
 
 const FeatureItem = ({ children }: { children: string }) => (
   <li className="flex items-start gap-3 text-sm text-gray-300">
@@ -11,6 +14,15 @@ const FeatureItem = ({ children }: { children: string }) => (
 
 export function PricingPage() {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    trackPageView('/pricing');
+  }, []);
+
+  const breadcrumbSchema = getBreadcrumbSchema([
+    { name: 'Home', url: '/' },
+    { name: 'Pricing', url: '/pricing' },
+  ]);
 
   const plans = [
     {
@@ -70,7 +82,15 @@ export function PricingPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-white">
+    <>
+      <SEO
+        title="Pricing - Secure API Key Management Plans"
+        description="Simple, transparent pricing for API key management. Free tier for solo developers. Starter plan at $9/month. Professional and Business plans coming soon."
+        url="/pricing"
+        keywords="API key management pricing, secrets management cost, secure API keys pricing, key vault pricing"
+        structuredData={breadcrumbSchema}
+      />
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-8">
           <Link to="/" className="text-emerald-400 hover:text-emerald-300 text-sm mb-4 inline-block">
@@ -216,6 +236,7 @@ export function PricingPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 

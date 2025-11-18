@@ -1,11 +1,30 @@
 import { Link } from 'react-router-dom';
+import { SEO, getBreadcrumbSchema } from '../components/SEO';
+import { useEffect } from 'react';
+import { trackPageView } from '../components/GoogleAnalytics';
 
 export function RefundPolicyPage() {
   const sectionSpacing = 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12';
   const lastUpdated = 'November 11, 2025';
 
+  useEffect(() => {
+    trackPageView('/refund');
+  }, []);
+
+  const breadcrumbSchema = getBreadcrumbSchema([
+    { name: 'Home', url: '/' },
+    { name: 'Refund Policy', url: '/refund' },
+  ]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-white">
+      <SEO
+        title="Refund Policy - APIVault"
+        description="APIVault Refund Policy. 30-day money-back guarantee. Learn about refund eligibility and process."
+        url="/refund"
+        keywords="refund policy, money back guarantee, refund process"
+        structuredData={breadcrumbSchema}
+      />
       <div className={sectionSpacing}>
         <div className="mb-8">
           <Link to="/" className="text-emerald-400 hover:text-emerald-300 text-sm mb-4 inline-block">

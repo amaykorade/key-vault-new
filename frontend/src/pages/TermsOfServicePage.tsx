@@ -1,11 +1,30 @@
 import { Link } from 'react-router-dom';
+import { SEO, getBreadcrumbSchema } from '../components/SEO';
+import { useEffect } from 'react';
+import { trackPageView } from '../components/GoogleAnalytics';
 
 export function TermsOfServicePage() {
   const sectionSpacing = 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12';
   const lastUpdated = 'November 11, 2025';
 
+  useEffect(() => {
+    trackPageView('/terms');
+  }, []);
+
+  const breadcrumbSchema = getBreadcrumbSchema([
+    { name: 'Home', url: '/' },
+    { name: 'Terms of Service', url: '/terms' },
+  ]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-white">
+      <SEO
+        title="Terms of Service - APIVault"
+        description="APIVault Terms of Service. Read our service terms, acceptable use policy, and user agreements."
+        url="/terms"
+        keywords="terms of service, user agreement, service terms, legal"
+        structuredData={breadcrumbSchema}
+      />
       <div className={sectionSpacing}>
         <div className="mb-8">
           <Link to="/" className="text-emerald-400 hover:text-emerald-300 text-sm mb-4 inline-block">

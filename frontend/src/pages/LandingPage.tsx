@@ -1,7 +1,9 @@
-import { FormEvent, useRef, useState } from 'react';
+import { FormEvent, useRef, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { apiService, ApiError } from '../services/api';
 import { ROUTES } from '../constants';
+import { SEO, getOrganizationSchema, getSoftwareApplicationSchema, getFAQSchema } from '../components/SEO';
+import { trackPageView } from '../components/GoogleAnalytics';
 
 const sectionSpacing = 'max-w-6xl mx-auto px-4 sm:px-6 lg:px-8';
 
@@ -132,8 +134,35 @@ export function LandingPage() {
     }
   };
 
+  useEffect(() => {
+    trackPageView('/');
+  }, []);
+
+  const faqs = [
+    { question: 'Are my keys secure?', answer: 'Yes, only you can decrypt them (AES-256).' },
+    { question: 'What if APIVault goes offline?', answer: 'You always have local export. No lock-in.' },
+    { question: 'Does it work with my APIs?', answer: 'It works with any API—Stripe, AWS, anything.' },
+    { question: 'Is it free?', answer: 'Solo devs get our free tier for life.' },
+    { question: 'What\'s the catch?', answer: 'Early feedback helps build the tool you need.' },
+  ];
+
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      getOrganizationSchema(),
+      getSoftwareApplicationSchema(),
+      getFAQSchema(faqs),
+    ],
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-white">
+      <SEO
+        title="Never Commit an API Key Again - Secure Secrets Management"
+        description="Store, rotate, and share API keys securely. Never commit secrets to GitHub again. Built for indie developers and teams. Free tier available."
+        url="/"
+        structuredData={structuredData}
+      />
       <header className={`pt-16 pb-20 ${sectionSpacing}`}>
         <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="space-y-6">

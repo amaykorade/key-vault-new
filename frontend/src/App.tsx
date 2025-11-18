@@ -1,36 +1,52 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { PublicRoute } from './components/PublicRoute';
-import { LoginPage } from './pages/LoginPage';
-import { SignupPage } from './pages/SignupPage';
-import { OrganizationsPage } from './pages/OrganizationsPage';
-import { OrganizationDetailsPage } from './pages/OrganizationDetailsPage';
-import { ProjectDetailsPage } from './pages/ProjectDetailsPage';
-import { ProjectsPage } from './pages/ProjectsPage';
-import { TeamDetailsPage } from './pages/TeamDetailsPage';
-import { TeamsPage } from './pages/TeamsPage';
-import { InvitationAcceptPage } from './pages/InvitationAcceptPage';
-import { AuditPage } from './pages/AuditPage';
-import { ApiPage } from './pages/ApiPage';
 import { ROUTES } from './constants';
-import { FolderPage } from './pages/FolderPage';
-import { AuthCallbackPage } from './pages/AuthCallbackPage';
-import { CliAuthPage } from './pages/CliAuthPage';
-import { CliGuidePage } from './pages/CliGuidePage';
-import { BillingPage } from './pages/BillingPage';
-import { LandingPage } from './pages/LandingPage';
-import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
-import { RefundPolicyPage } from './pages/RefundPolicyPage';
-import { TermsOfServicePage } from './pages/TermsOfServicePage';
-import { PricingPage } from './pages/PricingPage';
 import { AppLayout } from './components/layout/AppLayout';
+import { GoogleAnalytics } from './components/GoogleAnalytics';
+
+// Lazy load pages for better performance
+const LandingPage = lazy(() => import('./pages/LandingPage').then(m => ({ default: m.LandingPage })));
+const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
+const SignupPage = lazy(() => import('./pages/SignupPage').then(m => ({ default: m.SignupPage })));
+const PricingPage = lazy(() => import('./pages/PricingPage').then(m => ({ default: m.PricingPage })));
+const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage').then(m => ({ default: m.PrivacyPolicyPage })));
+const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage').then(m => ({ default: m.TermsOfServicePage })));
+const RefundPolicyPage = lazy(() => import('./pages/RefundPolicyPage').then(m => ({ default: m.RefundPolicyPage })));
+const ProjectsPage = lazy(() => import('./pages/ProjectsPage').then(m => ({ default: m.ProjectsPage })));
+const OrganizationsPage = lazy(() => import('./pages/OrganizationsPage').then(m => ({ default: m.OrganizationsPage })));
+const OrganizationDetailsPage = lazy(() => import('./pages/OrganizationDetailsPage').then(m => ({ default: m.OrganizationDetailsPage })));
+const ProjectDetailsPage = lazy(() => import('./pages/ProjectDetailsPage').then(m => ({ default: m.ProjectDetailsPage })));
+const FolderPage = lazy(() => import('./pages/FolderPage').then(m => ({ default: m.FolderPage })));
+const TeamsPage = lazy(() => import('./pages/TeamsPage').then(m => ({ default: m.TeamsPage })));
+const TeamDetailsPage = lazy(() => import('./pages/TeamDetailsPage').then(m => ({ default: m.TeamDetailsPage })));
+const InvitationAcceptPage = lazy(() => import('./pages/InvitationAcceptPage').then(m => ({ default: m.InvitationAcceptPage })));
+const AuditPage = lazy(() => import('./pages/AuditPage').then(m => ({ default: m.AuditPage })));
+const ApiPage = lazy(() => import('./pages/ApiPage').then(m => ({ default: m.ApiPage })));
+const AuthCallbackPage = lazy(() => import('./pages/AuthCallbackPage').then(m => ({ default: m.AuthCallbackPage })));
+const CliAuthPage = lazy(() => import('./pages/CliAuthPage').then(m => ({ default: m.CliAuthPage })));
+const CliGuidePage = lazy(() => import('./pages/CliGuidePage').then(m => ({ default: m.CliGuidePage })));
+const BillingPage = lazy(() => import('./pages/BillingPage').then(m => ({ default: m.BillingPage })));
+
+// Loading component
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
+    <div className="text-center">
+      <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-emerald-500 border-r-transparent"></div>
+      <p className="mt-4 text-gray-400">Loading...</p>
+    </div>
+  </div>
+);
 
 function App() {
   return (
     <Router>
+      <GoogleAnalytics />
       <div className="App">
-        <Routes>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
           {/* Public routes */}
           <Route
             path={ROUTES.LOGIN}
@@ -189,6 +205,7 @@ function App() {
           {/* Default redirect */}
           <Route path="*" element={<LoginPage />} />
         </Routes>
+        </Suspense>
 
         {/* Toast notifications */}
         <Toaster

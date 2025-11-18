@@ -1,0 +1,19 @@
+# Allow all search engines to index public pages
+User-agent: *
+Allow: /
+Allow: /pricing
+Allow: /privacy
+Allow: /terms
+Allow: /refund
+
+# Disallow authenticated routes
+Disallow: /projects
+Disallow: /settings
+Disallow: /billing
+Disallow: /api
+Disallow: /login
+Disallow: /signup
+
+# Sitemap location
+Sitemap: https://www.api.apivault.it.com/sitemap.xml
+
