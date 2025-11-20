@@ -15,5 +15,5 @@ Disallow: /login
 Disallow: /signup
 
 # Sitemap location
-Sitemap: https://www.api.apivault.it.com/sitemap.xml
+Sitemap: https://www.apivault.it.com/sitemap.xml
 

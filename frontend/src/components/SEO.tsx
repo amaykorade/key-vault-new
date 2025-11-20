@@ -13,8 +13,8 @@ interface SEOProps {
 
 const defaultTitle = 'APIVault - Secure API Key Management for Developers';
 const defaultDescription = 'Store, rotate, and share API keys securely. Never commit secrets to GitHub again. Built for indie developers and teams.';
-const defaultImage = 'https://www.api.apivault.it.com/og-image.png';
-const siteUrl = 'https://www.api.apivault.it.com';
+const defaultImage = 'https://www.apivault.it.com/og-image.png';
+const siteUrl = 'https://www.apivault.it.com';
 
 export function SEO({
   title,
