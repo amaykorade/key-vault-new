@@ -19,12 +19,37 @@ import { requireAuth, AuthRequest } from './middleware/auth';
 import cliRoutes from './routes/cli';
 import folderRoutes from './routes/folders';
 import publicRoutes from './routes/public';
+import path from 'path';
 
 const app = express();
 
 app.use(helmet());
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Serve Google Search Console verification file
+app.get('/googlec41d96065722b6ef.html', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/googlec41d96065722b6ef.html'));
+});
+
+// Serve robots.txt and sitemap.xml if needed
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain');
+  res.send('User-agent: *\nDisallow: /api/\n');
+});
+
+app.get('/sitemap.xml', (req, res) => {
+  res.type('application/xml');
+  res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://www.api.apivault.it.com/</loc>
+    <lastmod>${new Date().toISOString().split('T')[0]}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>`);
+});
 
 // CORS configuration - allow frontend origin(s)
 const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
