@@ -49,6 +49,9 @@ export function SEO({
     setMetaTag('keywords', keywords);
     setMetaTag('author', 'APIVault');
     setMetaTag('viewport', 'width=device-width, initial-scale=1.0');
+    
+    // Google Search Console Verification - Always preserve this
+    setMetaTag('google-site-verification', 'KFZTa0YprQ7LyAWe3ykYC4XnrZUY_XvaPTUdZCiMJG0');
 
     // Open Graph tags
     setMetaTag('og:title', fullTitle, 'property');
