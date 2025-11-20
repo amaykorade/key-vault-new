@@ -2,10 +2,22 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
-  "rewrites": [
+  "routes": [
     {
-      "source": "/((?!googlec41d96065722b6ef.html|robots.txt|sitemap.xml|vite.svg).*)",
-      "destination": "/index.html"
+      "src": "/googlec41d96065722b6ef.html",
+      "dest": "/googlec41d96065722b6ef.html"
+    },
+    {
+      "src": "/robots.txt",
+      "dest": "/robots.txt"
+    },
+    {
+      "src": "/sitemap.xml",
+      "dest": "/sitemap.xml"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ],
   "headers": [
