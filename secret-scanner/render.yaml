@@ -1,0 +1,23 @@
+services:
+  # Secret Scanner Web Service
+  - type: web
+    name: secret-scanner
+    env: node
+    region: oregon
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: NEXT_PUBLIC_GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: NEXT_PUBLIC_GITHUB_CALLBACK_URL
+        value: https://scan.apivault.it.com/api/auth/github/callback
+      - key: NEXT_PUBLIC_APIVAULT_URL
+        value: https://www.apivault.it.com
+
