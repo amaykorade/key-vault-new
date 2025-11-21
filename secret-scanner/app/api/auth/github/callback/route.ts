@@ -13,18 +13,28 @@ export async function GET(request: NextRequest) {
     const error = searchParams.get('error');
     const errorDescription = searchParams.get('error_description');
 
+    // Get the production origin from environment or request headers
+    const getOrigin = () => {
+      return (
+        process.env.NEXT_PUBLIC_FRONTEND_URL ||
+        (request.headers.get('x-forwarded-proto') && request.headers.get('x-forwarded-host')
+          ? `${request.headers.get('x-forwarded-proto')}://${request.headers.get('x-forwarded-host')}`
+          : request.nextUrl.origin)
+      );
+    };
+
     // Check for GitHub OAuth errors
     if (error) {
       console.error('GitHub OAuth error:', error, errorDescription);
       return NextResponse.redirect(
-        new URL(`/?error=${encodeURIComponent(errorDescription || error || 'GitHub OAuth authorization failed')}`, request.url)
+        new URL(`/?error=${encodeURIComponent(errorDescription || error || 'GitHub OAuth authorization failed')}`, getOrigin())
       );
     }
 
     if (!code) {
       console.error('No code provided in callback');
       return NextResponse.redirect(
-        new URL(`/?error=${encodeURIComponent('GitHub OAuth code not provided')}`, request.url)
+        new URL(`/?error=${encodeURIComponent('GitHub OAuth code not provided')}`, getOrigin())
       );
     }
 
@@ -34,8 +44,9 @@ export async function GET(request: NextRequest) {
 
     if (!clientId || !clientSecret) {
       console.error('GitHub OAuth not configured:', { hasClientId: !!clientId, hasClientSecret: !!clientSecret });
+      const origin = getOrigin();
       return NextResponse.redirect(
-        new URL(`/?error=${encodeURIComponent('GitHub OAuth is not configured. Please set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET environment variables.')}`, request.url)
+        new URL(`/?error=${encodeURIComponent('GitHub OAuth is not configured. Please set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET environment variables.')}`, origin)
       );
     }
 
@@ -51,7 +62,7 @@ export async function GET(request: NextRequest) {
       console.error('Failed to exchange code:', error);
       const errorMsg = error?.message || 'Failed to exchange GitHub OAuth code';
       return NextResponse.redirect(
-        new URL(`/?error=${encodeURIComponent(errorMsg)}`, request.url)
+        new URL(`/?error=${encodeURIComponent(errorMsg)}`, getOrigin())
       );
     }
 
@@ -63,7 +74,7 @@ export async function GET(request: NextRequest) {
       console.error('Failed to get user info:', error);
       const errorMsg = error?.message || 'Failed to fetch GitHub user information';
       return NextResponse.redirect(
-        new URL(`/?error=${encodeURIComponent(errorMsg)}`, request.url)
+        new URL(`/?error=${encodeURIComponent(errorMsg)}`, getOrigin())
       );
     }
 
@@ -77,17 +88,28 @@ export async function GET(request: NextRequest) {
     }
 
     // Redirect to frontend with token (store in sessionStorage on client)
-    const frontendUrl = new URL(redirectUrl, request.url);
+    const origin = getOrigin();
+    const frontendUrl = new URL(redirectUrl, origin);
     frontendUrl.searchParams.set('github_token', access_token);
     frontendUrl.searchParams.set('github_user', user.login);
     frontendUrl.searchParams.set('github_scope', scope);
 
+    console.log('[GitHub Callback] Redirecting to:', frontendUrl.toString());
     return NextResponse.redirect(frontendUrl);
   } catch (error) {
     console.error('GitHub callback error:', error);
     const errorMessage = error instanceof Error ? error.message : 'GitHub OAuth failed';
+    // Get origin for error redirect (re-use same logic)
+    const getOrigin = () => {
+      return (
+        process.env.NEXT_PUBLIC_FRONTEND_URL ||
+        (request.headers.get('x-forwarded-proto') && request.headers.get('x-forwarded-host')
+          ? `${request.headers.get('x-forwarded-proto')}://${request.headers.get('x-forwarded-host')}`
+          : request.nextUrl.origin)
+      );
+    };
     return NextResponse.redirect(
-      new URL(`/?error=${encodeURIComponent(errorMessage)}`, request.url)
+      new URL(`/?error=${encodeURIComponent(errorMessage)}`, getOrigin())
     );
   }
 }

@@ -43,8 +43,15 @@ npm run build  # ✅ Already completed
    Environment: Node
    Build Command: npm install && npm run build
    Start Command: npm start
+   Publish Directory: (leave empty - not used for web services)
    Instance Type: Free (or Starter)
    ```
+
+   **Quick Reference**:
+   - **Root Directory**: `secret-scanner` (must match folder name)
+   - **Build Command**: `npm install && npm run build`
+   - **Start Command**: `npm start`
+   - **Publish Directory**: Leave empty (only for static sites, not Next.js web services)
 
 5. **Add Environment Variables**:
    ```
@@ -53,6 +60,7 @@ npm run build  # ✅ Already completed
    NEXT_PUBLIC_GITHUB_CLIENT_ID=your_github_client_id
    GITHUB_CLIENT_SECRET=your_github_client_secret
    NEXT_PUBLIC_GITHUB_CALLBACK_URL=https://scan.apivault.it.com/api/auth/github/callback
+   NEXT_PUBLIC_FRONTEND_URL=https://scan.apivault.it.com
    NEXT_PUBLIC_APIVAULT_URL=https://www.apivault.it.com
    ```
 
@@ -190,25 +198,48 @@ npm run build  # ✅ Already completed
 
 ⚠️ **CRITICAL**: Set root directory to `secret-scanner` in Render settings!
 
+**Value**: `secret-scanner`
+
+**Why**: This tells Render to look for `package.json` and other files inside the `secret-scanner/` folder, not at the repository root.
+
 If you don't, Render will look for `package.json` in the repository root and fail.
 
 ### Build Command
 
-```
-npm install && npm run build
-```
+**Value**: `npm install && npm run build`
 
 This:
-1. Installs dependencies
-2. Builds Next.js for production
+1. `npm install` - Installs all dependencies from `package.json`
+2. `npm run build` - Builds the Next.js app for production (creates `.next/` folder)
 
 ### Start Command
 
-```
-npm start
-```
+**Value**: `npm start`
 
 Next.js will automatically use `$PORT` environment variable (10000 for Render).
+
+**Note**: Make sure your `package.json` has:
+```json
+{
+  "scripts": {
+    "start": "next start -p ${PORT:-3000}"
+  }
+}
+```
+
+### Publish Directory
+
+**Value**: Leave empty (do not set)
+
+**Why**: 
+- Publish Directory is **only for static sites** (HTML/CSS/JS files)
+- This is a **Next.js web service** (server-side rendering)
+- Next.js needs a Node.js server running, not static files
+
+**When to use Publish Directory**:
+- Static site generators (Jekyll, Hugo, etc.)
+- React apps with `npm run build` that output to `dist/` or `build/`
+- **NOT** for Next.js web services
 
 ### Port Configuration
 
