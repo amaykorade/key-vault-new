@@ -84,8 +84,14 @@ export const useAuthStore = create<AuthStore>()(
 
       getCurrentUser: async () => {
         if (!apiService.isAuthenticated()) {
-          set({ isAuthenticated: false, user: null });
+          set({ isAuthenticated: false, user: null, isLoading: false });
           return;
+        }
+
+        // Prevent multiple simultaneous calls
+        const currentState = get();
+        if (currentState.isLoading) {
+          return; // Already checking, don't start another check
         }
 
         set({ isLoading: true, error: null });
@@ -98,11 +104,15 @@ export const useAuthStore = create<AuthStore>()(
             error: null,
           });
         } catch (error: any) {
+          // On 401, clear the invalid token
+          if (error.status === 401 || error.status === 403) {
+            apiService.logout();
+          }
           set({
             user: null,
             isAuthenticated: false,
             isLoading: false,
-            error: error.message || 'Failed to get user',
+            error: null, // Don't show error for invalid token on page load
           });
         }
       },

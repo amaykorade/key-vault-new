@@ -3,6 +3,7 @@ import { SecretService, SecretSchema } from '../services/secret';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { auditSecretCreate, auditSecretUpdate, auditSecretDelete, auditSecretAccess } from '../middleware/audit';
 import { AuditService } from '../services/audit';
+import { parseEnvFile } from '../lib/env-parser';
 
 const router = Router();
 
@@ -357,6 +358,142 @@ router.get('/projects/:projectId/secrets/type/:type', requireAuth, async (req: A
     console.error('Get secrets by type error:', error);
     if (error instanceof Error && error.message === 'Access denied') {
       return res.status(403).json({ error: 'Access denied' });
+    }
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Bulk import secrets from .env file
+router.post('/projects/:projectId/secrets/import', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { projectId } = req.params;
+    const { content, environment, folder, conflictResolution } = req.body;
+
+    // Validate required fields
+    if (!content || typeof content !== 'string') {
+      return res.status(400).json({ error: 'File content is required' });
+    }
+
+    if (!environment || typeof environment !== 'string') {
+      return res.status(400).json({ error: 'Environment is required' });
+    }
+
+    if (!folder || typeof folder !== 'string') {
+      return res.status(400).json({ error: 'Folder is required' });
+    }
+
+    const resolution = conflictResolution || 'skip';
+    if (resolution !== 'skip' && resolution !== 'overwrite') {
+      return res.status(400).json({ error: 'Conflict resolution must be "skip" or "overwrite"' });
+    }
+
+    // Validate file size (max 1MB)
+    if (content.length > 1024 * 1024) {
+      return res.status(400).json({ error: 'File too large (max 1MB)' });
+    }
+
+    // Parse .env file
+    const parseResult = parseEnvFile(content);
+
+    if (parseResult.errors.length > 0 && parseResult.secrets.length === 0) {
+      return res.status(400).json({
+        error: 'Failed to parse .env file',
+        details: parseResult.errors,
+      });
+    }
+
+    // Limit to 500 secrets per import
+    if (parseResult.secrets.length > 500) {
+      return res.status(400).json({ error: 'Too many secrets (max 500 per import)' });
+    }
+
+    // Import secrets
+    const importResult = await SecretService.importSecrets(
+      projectId,
+      req.user!.id,
+      parseResult.secrets.map(s => ({
+        name: s.name,
+        value: s.value,
+      })),
+      environment,
+      folder,
+      resolution as 'skip' | 'overwrite'
+    );
+
+    // Log audit events for imported secrets
+    const ipAddress = req.ip || req.connection?.remoteAddress;
+    const project = await require('../lib/db').db.project.findUnique({
+      where: { id: projectId },
+      select: { organizationId: true },
+    });
+
+    // Log bulk import (one audit log entry for the entire import)
+    await AuditService.log({
+      userId: req.user!.id,
+      projectId,
+      organizationId: project?.organizationId,
+      eventType: 'secret_bulk_import',
+      action: 'import',
+      resourceType: 'secrets',
+      environment,
+      folder,
+      metadata: {
+        totalSecrets: parseResult.secrets.length,
+        imported: importResult.imported,
+        skipped: importResult.skipped,
+        failed: importResult.failed,
+        conflictResolution: resolution,
+      },
+      description: `Bulk imported ${importResult.imported} secrets (${importResult.skipped} skipped, ${importResult.failed} failed)`,
+      ipAddress,
+    }).catch(console.error);
+
+    // Also log individual secret creations/updates for audit trail
+    for (const imported of importResult.importedSecrets) {
+      if (imported.action === 'created') {
+        await AuditService.logSecretCreate(
+          req.user!.id,
+          imported.id,
+          imported.name,
+          projectId,
+          project?.organizationId,
+          environment,
+          folder,
+          'API_KEY', // Type will be auto-detected
+          ipAddress
+        ).catch(console.error);
+      } else if (imported.action === 'updated') {
+        await AuditService.logSecretUpdate(
+          req.user!.id,
+          imported.id,
+          imported.name,
+          projectId,
+          project?.organizationId,
+          environment,
+          folder,
+          ['value'], // Updated field
+          ipAddress
+        ).catch(console.error);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      summary: {
+        total: importResult.total,
+        imported: importResult.imported,
+        skipped: importResult.skipped,
+        failed: importResult.failed,
+      },
+      importedSecrets: importResult.importedSecrets,
+      skippedSecrets: importResult.skippedSecrets,
+      failedSecrets: importResult.failedSecrets,
+      parseErrors: parseResult.errors,
+    });
+  } catch (error) {
+    console.error('Bulk import error:', error);
+    if (error instanceof Error && error.message === 'Access denied') {
+      return res.status(403).json({ error: error.message });
     }
     res.status(500).json({ error: 'Internal server error' });
   }

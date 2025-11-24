@@ -10,6 +10,7 @@ import { SecretRow } from '../components/SecretRow';
 import { SecretForm } from '../components/forms/SecretForm';
 import { SecretModal } from '../components/forms/SecretModal';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
+import { EnvImportModal } from '../components/EnvImportModal';
 import { apiService } from '../services/api';
 import type { Project, Secret } from '../types';
 
@@ -71,11 +72,15 @@ export function FolderPage() {
   const [secrets, setSecrets] = useState<Secret[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showCreateSecret, setShowCreateSecret] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [selectedSecret, setSelectedSecret] = useState<Secret | null>(null);
   const [showSecretModal, setShowSecretModal] = useState(false);
   const [showDeleteSecretModal, setShowDeleteSecretModal] = useState(false);
   const [secretToDelete, setSecretToDelete] = useState<Secret | null>(null);
   const [isDeletingSecret, setIsDeletingSecret] = useState(false);
+  const [selectedSecretsForDelete, setSelectedSecretsForDelete] = useState<Set<string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [isGeneratingToken, setIsGeneratingToken] = useState(false);
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
   const [tokensLoading, setTokensLoading] = useState(false);
@@ -314,6 +319,21 @@ const breadcrumbItems = useMemo(() => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, env, folder]);
 
+  // Close download menu when clicking outside
+  useEffect(() => {
+    if (!showDownloadMenu) return;
+    
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.download-menu-container')) {
+        setShowDownloadMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showDownloadMenu]);
+
   useEffect(() => {
     if (activeTab === 'access') {
       fetchTokens();
@@ -518,6 +538,160 @@ const breadcrumbItems = useMemo(() => {
     }
   }
 
+  async function handleBulkDelete() {
+    if (selectedSecretsForDelete.size === 0 || isBulkDeleting) return;
+    
+    const count = selectedSecretsForDelete.size;
+    const loadingToast = toast.loading(`Deleting ${count} secret${count !== 1 ? 's' : ''}...`);
+    
+    try {
+      setIsBulkDeleting(true);
+      
+      // Delete all selected secrets in parallel
+      const deletePromises = Array.from(selectedSecretsForDelete).map(secretId =>
+        apiService.deleteSecret(secretId).catch((error) => {
+          console.error(`Failed to delete secret ${secretId}:`, error);
+          return { error, secretId };
+        })
+      );
+      
+      const results = await Promise.all(deletePromises);
+      const errors = results.filter(r => r && 'error' in r);
+      
+      if (errors.length > 0) {
+        toast.dismiss(loadingToast);
+        toast.error(`Failed to delete ${errors.length} of ${count} secret${count !== 1 ? 's' : ''}.`);
+      } else {
+        toast.dismiss(loadingToast);
+        toast.success(`Successfully deleted ${count} secret${count !== 1 ? 's' : ''}.`);
+      }
+      
+      // Clear selection and refresh
+      setSelectedSecretsForDelete(new Set());
+      await fetchSecrets();
+      
+      // Check sync status after deleting secrets (small delay to ensure DB commit)
+      if (vercelConnected) {
+        setTimeout(() => checkSyncStatus(), 100);
+      }
+    } catch (error) {
+      console.error('Failed to bulk delete secrets:', error);
+      toast.dismiss(loadingToast);
+      toast.error('Failed to delete secrets. Please try again.');
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  }
+
+  function toggleSecretSelection(secretId: string) {
+    setSelectedSecretsForDelete(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(secretId)) {
+        newSet.delete(secretId);
+      } else {
+        newSet.add(secretId);
+      }
+      return newSet;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedSecretsForDelete.size === secrets.length) {
+      setSelectedSecretsForDelete(new Set());
+    } else {
+      setSelectedSecretsForDelete(new Set(secrets.map(s => s.id)));
+    }
+  }
+
+  // Download secrets in various formats
+  async function downloadSecretsWithValues(format: 'env' | 'json' | 'yaml' | 'csv') {
+    if (secrets.length === 0) {
+      toast.error('No secrets to download');
+      return;
+    }
+
+    const loadingToast = toast.loading('Fetching secret values...');
+
+    try {
+      // Fetch all secrets with their values
+      const secretsWithValues = await Promise.all(
+        secrets.map(async (secret) => {
+          try {
+            const response = await apiService.getSecret(secret.id, true);
+            return { ...secret, value: response.secret.value };
+          } catch (error) {
+            console.error(`Failed to fetch value for ${secret.name}:`, error);
+            return { ...secret, value: '***' };
+          }
+        })
+      );
+
+      toast.dismiss(loadingToast);
+
+      let content = '';
+      let filename = '';
+      let mimeType = '';
+
+      switch (format) {
+        case 'env':
+          content = secretsWithValues
+            .map(s => `${s.name}=${s.value || ''}`)
+            .join('\n');
+          filename = `${projectDetails?.name || 'secrets'}-${env}-${folder || 'default'}.env`;
+          mimeType = 'text/plain';
+          break;
+
+        case 'json':
+          content = JSON.stringify(
+            secretsWithValues.reduce((acc, s) => {
+              acc[s.name] = s.value || '';
+              return acc;
+            }, {} as Record<string, string>),
+            null,
+            2
+          );
+          filename = `${projectDetails?.name || 'secrets'}-${env}-${folder || 'default'}.json`;
+          mimeType = 'application/json';
+          break;
+
+        case 'yaml':
+          content = secretsWithValues
+            .map(s => `${s.name}: ${s.value || ''}`)
+            .join('\n');
+          filename = `${projectDetails?.name || 'secrets'}-${env}-${folder || 'default'}.yaml`;
+          mimeType = 'text/yaml';
+          break;
+
+        case 'csv':
+          content = 'Name,Type,Value\n' + secretsWithValues
+            .map(s => `"${s.name}","${s.type}","${s.value || ''}"`)
+            .join('\n');
+          filename = `${projectDetails?.name || 'secrets'}-${env}-${folder || 'default'}.csv`;
+          mimeType = 'text/csv';
+          break;
+      }
+
+      // Create blob and download
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success(`Downloaded ${secrets.length} secret${secrets.length !== 1 ? 's' : ''} as ${format.toUpperCase()}`);
+      setShowDownloadMenu(false);
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      console.error('Failed to download secrets:', error);
+      toast.error('Failed to download secrets. Please try again.');
+      setShowDownloadMenu(false);
+    }
+  }
+
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -650,15 +824,86 @@ const breadcrumbItems = useMemo(() => {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
             <CardTitle className="text-white text-sm font-semibold">Secrets</CardTitle>
-              <button
-                onClick={handleQuickCreateSecret}
-                className="w-8 h-8 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center shadow transition-colors"
-                title="Add Secret"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12M6 12h12" />
-                </svg>
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setShowImportModal(true)}
+                  className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 text-white flex items-center justify-center shadow transition-colors"
+                  title="Import Environment Variables"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                </button>
+                <button
+                  onClick={handleQuickCreateSecret}
+                  className="w-8 h-8 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center shadow transition-colors"
+                  title="Add Secret"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12M6 12h12" />
+                  </svg>
+                </button>
+                <div className="relative download-menu-container">
+                  <button
+                    onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+                    className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 text-white flex items-center justify-center shadow transition-colors"
+                    title="Download Options"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                    </svg>
+                  </button>
+                  {showDownloadMenu && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setShowDownloadMenu(false)}
+                      />
+                      <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 py-1">
+                        <div className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase border-b border-gray-700">
+                          Download as
+                        </div>
+                        <button
+                          onClick={() => downloadSecretsWithValues('env')}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center space-x-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <span>.env File</span>
+                        </button>
+                        <button
+                          onClick={() => downloadSecretsWithValues('json')}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center space-x-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <span>JSON</span>
+                        </button>
+                        <button
+                          onClick={() => downloadSecretsWithValues('yaml')}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center space-x-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <span>YAML</span>
+                        </button>
+                        <button
+                          onClick={() => downloadSecretsWithValues('csv')}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center space-x-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <span>CSV</span>
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -688,18 +933,56 @@ const breadcrumbItems = useMemo(() => {
               </div>
             ) : (
               <div className="overflow-hidden">
-                <div className="px-4 py-2 text-xs text-gray-400 flex items-center gap-2">
-                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  <span>Tip: Click the name or value to edit inline.</span>
+                <div className="px-4 py-2 text-xs text-gray-400 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>Tip: Click the name or value to edit inline.</span>
+                  </div>
+                  {selectedSecretsForDelete.size > 0 && (
+                    <div className="flex items-center gap-3">
+                      <span className="text-emerald-400 font-medium">
+                        {selectedSecretsForDelete.size} secret{selectedSecretsForDelete.size !== 1 ? 's' : ''} selected
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedSecretsForDelete(new Set())}
+                        disabled={isBulkDeleting}
+                        className="text-gray-300 border-gray-700 hover:bg-gray-800"
+                      >
+                        Clear
+                      </Button>
+                      <Button
+                        variant="gradient"
+                        size="sm"
+                        onClick={handleBulkDelete}
+                        disabled={isBulkDeleting}
+                        loading={isBulkDeleting}
+                        className="bg-red-600 hover:bg-red-700 text-white border-red-600"
+                      >
+                        {isBulkDeleting ? 'Deleting...' : `Delete ${selectedSecretsForDelete.size}`}
+                      </Button>
+                    </div>
+                  )}
                 </div>
                 <div className="w-full">
                 <Table className="table-fixed w-full">
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[25%]">Name</TableHead>
+                      <TableHead className="w-[5%]">
+                        <input
+                          type="checkbox"
+                          checked={secrets.length > 0 && selectedSecretsForDelete.size === secrets.length}
+                          onChange={toggleSelectAll}
+                          disabled={isBulkDeleting || secrets.length === 0}
+                          className="rounded border-gray-600 text-emerald-500 focus:ring-emerald-500 disabled:opacity-50"
+                          title="Select all"
+                        />
+                      </TableHead>
+                      <TableHead className="w-[20%]">Name</TableHead>
                       <TableHead className="w-[15%]">Type</TableHead>
-                      <TableHead className="w-[45%]">Secret</TableHead>
-                      <TableHead className="w-[15%] text-right">Actions</TableHead>
+                      <TableHead className="w-[40%]">Secret</TableHead>
+                      <TableHead className="w-[20%] text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -707,12 +990,16 @@ const breadcrumbItems = useMemo(() => {
                   <SecretRow
                     key={secret.id}
                     secret={secret}
-                        forceEditNameId={forceEditNameId}
-                        isTable
-                        onReveal={handleRevealSecret}
-                        onHide={handleHideSecret}
-                        isRevealed={revealedSecrets.has(secret.id)}
-                        isRevealing={revealingSecrets.has(secret.id)}
+                    forceEditNameId={forceEditNameId}
+                    isTable
+                    showCheckbox
+                    isSelected={selectedSecretsForDelete.has(secret.id)}
+                    onToggleSelect={toggleSecretSelection}
+                    isSelectionDisabled={isBulkDeleting}
+                    onReveal={handleRevealSecret}
+                    onHide={handleHideSecret}
+                    isRevealed={revealedSecrets.has(secret.id)}
+                    isRevealing={revealingSecrets.has(secret.id)}
                     onEdit={async (updatedSecret) => {
                       try {
                         const updateData: any = {};
@@ -2167,6 +2454,19 @@ const breadcrumbItems = useMemo(() => {
             </div>
           </div>
         </div>
+      )}
+
+      {showImportModal && id && env && folder && (
+        <EnvImportModal
+          projectId={id}
+          environment={env}
+          folder={folder || 'default'}
+          onClose={() => setShowImportModal(false)}
+          onSuccess={async () => {
+            await fetchSecrets();
+            setShowImportModal(false);
+          }}
+        />
       )}
 
       {showCreateSecret && (

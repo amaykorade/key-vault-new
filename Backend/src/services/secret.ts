@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { encryptSecret, decryptSecret, maskSecret } from '../lib/encryption';
 import { AccessControlService } from './access-control';
 import { FolderService } from './folder';
+import { detectSecretType } from '../lib/env-parser';
 
 export const SecretSchema = {
   create: z.object({
@@ -395,5 +396,125 @@ export class SecretService {
       value: maskSecret(decryptSecret(secret.value)),
       maskedValue: maskSecret(decryptSecret(secret.value)),
     }));
+  }
+
+  /**
+   * Bulk import secrets from .env file
+   */
+  static async importSecrets(
+    projectId: string,
+    userId: string,
+    secrets: Array<{
+      name: string;
+      value: string;
+      type?: string;
+      description?: string;
+    }>,
+    environment: string,
+    folder: string,
+    conflictResolution: 'skip' | 'overwrite'
+  ) {
+    // Check if user has write access
+    const canWrite = await AccessControlService.canWrite(userId, projectId);
+    if (!canWrite) {
+      throw new Error('Access denied: You need WRITE permission to import secrets');
+    }
+
+    // Ensure folder exists
+    await FolderService.ensureFolderRecord(projectId, environment, folder, userId);
+
+    const results = {
+      imported: [] as any[],
+      skipped: [] as Array<{ name: string; reason: string }>,
+      failed: [] as Array<{ name: string; error: string }>,
+    };
+
+    // Process secrets in batches to avoid overwhelming the database
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < secrets.length; i += BATCH_SIZE) {
+      const batch = secrets.slice(i, i + BATCH_SIZE);
+      
+      await Promise.all(
+        batch.map(async (secretData) => {
+          try {
+            // Auto-detect secret type if not provided
+            const secretType = (secretData.type || detectSecretType(secretData.name, secretData.value)) as any;
+            
+            // Check if secret already exists
+            const existingSecret = await db.secret.findFirst({
+              where: {
+                projectId,
+                name: secretData.name,
+                environment,
+                folder,
+              },
+            });
+
+            if (existingSecret) {
+              if (conflictResolution === 'skip') {
+                results.skipped.push({
+                  name: secretData.name,
+                  reason: 'Secret already exists',
+                });
+                return;
+              } else if (conflictResolution === 'overwrite') {
+                // Update existing secret
+                const encryptedValue = encryptSecret(secretData.value);
+                const updated = await db.secret.update({
+                  where: { id: existingSecret.id },
+                  data: {
+                    value: encryptedValue,
+                    type: secretType,
+                    description: secretData.description || existingSecret.description,
+                  },
+                });
+                results.imported.push({
+                  id: updated.id,
+                  name: updated.name,
+                  action: 'updated',
+                });
+                return;
+              }
+            }
+
+            // Create new secret
+            const encryptedValue = encryptSecret(secretData.value);
+            const created = await db.secret.create({
+              data: {
+                name: secretData.name,
+                description: secretData.description,
+                type: secretType,
+                environment,
+                folder,
+                value: encryptedValue,
+                projectId,
+                createdById: userId,
+              },
+            });
+
+            results.imported.push({
+              id: created.id,
+              name: created.name,
+              action: 'created',
+            });
+          } catch (error: any) {
+            results.failed.push({
+              name: secretData.name,
+              error: error.message || 'Failed to import secret',
+            });
+          }
+        })
+      );
+    }
+
+    return {
+      total: secrets.length,
+      imported: results.imported.length,
+      skipped: results.skipped.length,
+      failed: results.failed.length,
+      importedSecrets: results.imported,
+      skippedSecrets: results.skipped,
+      failedSecrets: results.failed,
+    };
   }
 }

@@ -16,6 +16,10 @@ interface SecretRowProps {
   onHide?: (secretId: string) => void;
   isRevealed?: boolean;
   isRevealing?: boolean;
+  showCheckbox?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (secretId: string) => void;
+  isSelectionDisabled?: boolean;
 }
 
 const SECRET_TYPES = [
@@ -44,7 +48,11 @@ export function SecretRow({
   onReveal,
   onHide,
   isRevealed = false,
-  isRevealing = false
+  isRevealing = false,
+  showCheckbox = false,
+  isSelected = false,
+  onToggleSelect,
+  isSelectionDisabled = false
 }: SecretRowProps) {
   const [showValue, setShowValue] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -97,6 +105,18 @@ export function SecretRow({
   if (isTable) {
     return (
       <TableRow className="group">
+        {/* Checkbox */}
+        {showCheckbox && (
+          <TableCell>
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={() => onToggleSelect?.(secret.id)}
+              disabled={isSelectionDisabled}
+              className="rounded border-gray-600 text-emerald-500 focus:ring-emerald-500 disabled:opacity-50"
+            />
+          </TableCell>
+        )}
         {/* Name */}
         <TableCell className="min-w-0">
           {isEditingName ? (

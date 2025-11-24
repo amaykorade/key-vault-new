@@ -351,6 +351,36 @@ class ApiService {
     });
   }
 
+  async importSecretsFromEnv(
+    projectId: string,
+    content: string,
+    environment: string,
+    folder: string,
+    conflictResolution: 'skip' | 'overwrite' = 'skip'
+  ): Promise<{
+    success: boolean;
+    summary: {
+      total: number;
+      imported: number;
+      skipped: number;
+      failed: number;
+    };
+    importedSecrets: Array<{ id: string; name: string; action: string }>;
+    skippedSecrets: Array<{ name: string; reason: string }>;
+    failedSecrets: Array<{ name: string; error: string }>;
+    parseErrors: Array<{ line: number; error: string; rawLine: string }>;
+  }> {
+    return this.request(`/secrets/projects/${projectId}/secrets/import`, {
+      method: 'POST',
+      body: JSON.stringify({
+        content,
+        environment,
+        folder,
+        conflictResolution,
+      }),
+    });
+  }
+
   async searchSecrets(params: SecretSearchParams): Promise<{ secrets: Secret[] }> {
     const searchParams = new URLSearchParams();
     if (params.q) searchParams.append('q', params.q);
