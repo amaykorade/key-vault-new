@@ -21,7 +21,11 @@ const EnvSchema = z.object({
 	SMTP_PASS: z.string().optional(),
 	FROM_EMAIL: z.string().email().optional(),
 	FROM_NAME: z.string().optional(),
-	FRONTEND_URL: z.string().url().optional()
+	FRONTEND_URL: z.string().url().optional(),
+	// Razorpay configuration
+	RAZORPAY_KEY_ID: z.string().optional(),
+	RAZORPAY_KEY_SECRET: z.string().optional(),
+	RAZORPAY_WEBHOOK_SECRET: z.string().optional()
 });
 
 export type AppEnv = z.infer<typeof EnvSchema>;

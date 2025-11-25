@@ -19,12 +19,13 @@ import { requireAuth, AuthRequest } from './middleware/auth';
 import cliRoutes from './routes/cli';
 import folderRoutes from './routes/folders';
 import publicRoutes from './routes/public';
+import paymentRoutes from './routes/payments';
 import path from 'path';
 
 const app = express();
 
 app.use(helmet());
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '10mb' })); // Increased for webhook payloads
 app.use(express.urlencoded({ extended: true }));
 
 // Serve Google Search Console verification file
@@ -158,6 +159,19 @@ app.use('/api/public', publicRoutes);
 app.use('/api/vercel', vercelRoutes);
 app.use('/api/auth/vercel', vercelRoutes); // OAuth callback
 app.use('/api', cliRoutes);
+
+// Payment routes
+// Webhook route needs raw body for signature verification - handle separately before JSON middleware
+app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), async (req, res, next) => {
+  // Parse JSON and attach to req.body for the route handler
+  try {
+    req.body = JSON.parse(req.body.toString('utf8'));
+  } catch (e) {
+    return res.status(400).json({ error: 'Invalid JSON in webhook payload' });
+  }
+  next();
+});
+app.use('/api/payments', paymentRoutes);
 
 // Protected route example
 app.get('/api/me', requireAuth, (req: AuthRequest, res) => {

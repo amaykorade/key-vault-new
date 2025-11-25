@@ -573,6 +573,48 @@ class ApiService {
     return this.request<{ logs: AuditLog[] }>(`/audit/folder/${projectId}/${encodeURIComponent(environment)}/${encodeURIComponent(folder)}?limit=${limit}&offset=${offset}`);
   }
 
+  // Payment/Subscription endpoints
+  async createPaymentOrder(plan: 'STARTER' | 'PROFESSIONAL' | 'BUSINESS', billingCycle: 'MONTHLY' | 'YEARLY'): Promise<{
+    success: boolean;
+    order: {
+      id: string;
+      amount: number;
+      currency: string;
+      keyId: string;
+    };
+  }> {
+    return this.request('/payments/create-order', {
+      method: 'POST',
+      body: JSON.stringify({ plan, billingCycle }),
+    });
+  }
+
+  async verifyPayment(orderId: string, paymentId: string, signature: string): Promise<{
+    success: boolean;
+    subscription: any;
+  }> {
+    return this.request('/payments/verify-payment', {
+      method: 'POST',
+      body: JSON.stringify({ orderId, paymentId, signature }),
+    });
+  }
+
+  async getSubscription(): Promise<{
+    success: boolean;
+    subscription: any;
+  }> {
+    return this.request('/payments/subscription');
+  }
+
+  async cancelSubscription(): Promise<{
+    success: boolean;
+    subscription: any;
+  }> {
+    return this.request('/payments/cancel-subscription', {
+      method: 'POST',
+    });
+  }
+
   // CLI token methods
   async createCliToken(name?: string): Promise<{ token: string; tokenMeta: any }> {
     return this.request<{ token: string; tokenMeta: any }>('/cli/token', {
