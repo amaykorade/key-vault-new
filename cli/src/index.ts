@@ -16,12 +16,12 @@ const program = new Command();
 
 program
   .name('keyvault')
-  .description('Key Vault CLI')
+  .description('APIVault CLI')
   .version(packageJson.version);
 
 program
   .command('login')
-  .description('Authenticate the CLI with your Key Vault account')
+  .description('Authenticate the CLI with your APIVault account')
   .option('-t, --token <token>', 'Provide a CLI token directly (legacy: manual token entry)')
   .option('-n, --name <name>', 'Friendly name for this device (stored with the token)')
   .action(async (options) => {

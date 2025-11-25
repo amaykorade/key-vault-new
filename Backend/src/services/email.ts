@@ -82,7 +82,7 @@ export class EmailService {
     try {
       const mailOptions = {
         from: {
-          name: env.FROM_NAME || 'Key Vault',
+          name: env.FROM_NAME || 'APIVault',
           address: env.FROM_EMAIL || env.SMTP_USER || 'noreply@example.com'
         },
         to: options.to,
@@ -275,8 +275,8 @@ export class EmailService {
             <p>If you didn't expect this invitation, you can safely ignore this email.</p>
             <p>This invitation link is unique to you and should not be shared.</p>
             <p style="margin-top: 20px;">
-              <strong>Key Vault</strong> - Secure Secret Management<br>
-              <a href="${frontendUrl}" style="color: #667eea;">Visit Key Vault</a>
+              <strong>APIVault</strong> - Secure Secret Management<br>
+              <a href="${frontendUrl}" style="color: #667eea;">Visit APIVault</a>
             </p>
           </div>
         </div>
@@ -307,7 +307,7 @@ If you didn't expect this invitation, you can safely ignore this email.
 This invitation link is unique to you and should not be shared.
 
 ---
-Key Vault - Secure Secret Management
+APIVault - Secure Secret Management
 ${frontendUrl}
     `;
 
@@ -546,8 +546,8 @@ ${frontendUrl}
           <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; color: #718096; font-size: 14px;">
             <p>Need help getting started? Contact your team lead or organization admin.</p>
             <p style="margin-top: 20px;">
-              <strong>Key Vault</strong> - Secure Secret Management<br>
-              <a href="${frontendUrl}" style="color: #10b981;">Visit Key Vault</a>
+              <strong>APIVault</strong> - Secure Secret Management<br>
+              <a href="${frontendUrl}" style="color: #10b981;">Visit APIVault</a>
             </p>
           </div>
         </div>
@@ -571,7 +571,7 @@ Get started: ${frontendUrl}/teams
 Need help getting started? Contact your team lead or organization admin.
 
 ---
-Key Vault - Secure Secret Management
+APIVault - Secure Secret Management
 ${frontendUrl}
     `;
 

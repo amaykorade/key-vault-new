@@ -65,5 +65,5 @@ services:
       - key: FROM_EMAIL
         sync: false
       - key: FROM_NAME
-        value: Key Vault
+        value: APIVault
 

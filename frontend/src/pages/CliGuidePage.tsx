@@ -24,7 +24,7 @@ export function CliGuidePage() {
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-16 animate-fade-in">
       <SectionTitle
-        title="Key Vault CLI Guide"
+        title="APIVault CLI Guide"
         subtitle="Authenticate via browser, configure your workspace, and inject secrets into any command in seconds."
       />
 
@@ -34,7 +34,7 @@ export function CliGuidePage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-gray-300 leading-relaxed">
-            The Key Vault CLI delivers a secure, Doppler-style workflow. Authenticate through a device-code browser flow,
+            The APIVault CLI delivers a secure, Doppler-style workflow. Authenticate through a device-code browser flow,
             choose your project/environment/folder, and run any command with secrets injected as environment variables.
             Secrets never touch disk—they live in memory for the lifetime of the process you launch.
           </p>
@@ -42,7 +42,7 @@ export function CliGuidePage() {
             <h3 className="text-sm text-white font-semibold mb-2">Prerequisites</h3>
             <ul className="space-y-1.5">
               <ListItem text="Node.js 18 or newer (for npm installations)" />
-              <ListItem text="Access to a Key Vault workspace" />
+              <ListItem text="Access to an APIVault workspace" />
               <ListItem text="Outbound HTTPS access to https://key-vault-new.onrender.com" />
               <ListItem text="For air-gapped setups: download the binary release or use the Docker image (coming soon)" />
             </ul>

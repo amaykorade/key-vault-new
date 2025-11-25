@@ -14,7 +14,7 @@ export function Header() {
               <div className="w-8 h-8 bg-gradient-to-r from-gray-600 to-gray-700 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-lg">🔐</span>
               </div>
-              <span className="font-bold text-xl gradient-text">Key Vault</span>
+              <span className="font-bold text-xl gradient-text">APIVault</span>
             </div>
           </div>
 

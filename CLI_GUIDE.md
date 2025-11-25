@@ -1,11 +1,11 @@
-# Key Vault CLI Guide
+# APIVault CLI Guide
 
 ## Overview
-Key Vault CLI provides a secure, device-code based workflow to authenticate via your browser, choose a project/environment/folder, and inject secrets into any command. Secrets exist only in process memory and are never written to disk.
+APIVault CLI provides a secure, device-code based workflow to authenticate via your browser, choose a project/environment/folder, and inject secrets into any command. Secrets exist only in process memory and are never written to disk.
 
 ## Prerequisites
 - Node.js 18 or newer (for the npm-based install)
-- Access to a Key Vault workspace
+- Access to an APIVault workspace
 - Ability to reach `https://key-vault-new.onrender.com`
 
 > No Node.js? Download the upcoming binary release or run the CLI in Docker (see *Alternative installation*).

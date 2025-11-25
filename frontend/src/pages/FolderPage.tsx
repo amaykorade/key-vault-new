@@ -2116,7 +2116,7 @@ const breadcrumbItems = useMemo(() => {
                   <li className="flex items-start gap-2">
                     <span className="text-emerald-400 font-bold">3.</span>
                     <span>
-                      Give it a name (e.g., "Key Vault Sync") and select scope:{' '}
+                      Give it a name (e.g., "APIVault Sync") and select scope:{' '}
                       <strong className="text-white">Full Access</strong> or specific projects
                     </span>
                   </li>

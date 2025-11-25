@@ -233,7 +233,7 @@ export function CliAuthPage() {
               <div>
                 <h3 className="font-semibold text-blue-300 mb-1">CLI Authorization Request</h3>
                 <p className="text-sm text-blue-200">
-                  A CLI device is requesting access to your Key Vault account.
+                  A CLI device is requesting access to your APIVault account.
                 </p>
               </div>
             </div>

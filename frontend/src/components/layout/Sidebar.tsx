@@ -138,7 +138,7 @@ export function Sidebar() {
             </svg>
           </div>
           <div>
-            <h1 className="text-lg font-bold text-white">Key Vault</h1>
+            <h1 className="text-lg font-bold text-white">APIVault</h1>
             <p className="text-xs text-gray-400">Secure Secrets</p>
           </div>
         </Link>

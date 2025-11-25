@@ -113,7 +113,7 @@ export function PricingPage() {
               <div className="flex flex-col gap-3 text-sm text-gray-400 md:flex-row md:items-center">
                 <div className="flex items-center gap-2">
                   <span className="flex h-2 w-2 rounded-full bg-emerald-400" aria-hidden />
-                  Cancel or upgrade anytime directly inside Key Vault.
+                  Cancel or upgrade anytime directly inside APIVault.
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="flex h-2 w-2 rounded-full bg-emerald-400" aria-hidden />

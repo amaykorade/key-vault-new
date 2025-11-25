@@ -1,7 +1,7 @@
 {
   "name": "@keyvault/cli",
   "version": "0.1.2",
-  "description": "Key Vault CLI for managing secrets from the terminal",
+  "description": "APIVault CLI for managing secrets from the terminal",
   "bin": {
     "keyvault": "dist/index.cjs"
   },
@@ -17,7 +17,7 @@
     "secrets",
     "devops"
   ],
-  "author": "Key Vault",
+  "author": "APIVault",
   "license": "MIT",
   "dependencies": {
     "chalk": "^4.1.2",

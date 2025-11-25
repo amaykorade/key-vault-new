@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Complete Local Development Setup Script
-echo "🚀 Setting up Key Vault for local development..."
+echo "🚀 Setting up APIVault for local development..."
 echo ""
 
 # Colors for output
@@ -12,7 +12,7 @@ NC='\033[0m' # No Color
 
 # Check if we're in the right directory
 if [ ! -f "README.md" ]; then
-    echo -e "${RED}❌ Error: Please run this script from the Key Vault root directory${NC}"
+    echo -e "${RED}❌ Error: Please run this script from the APIVault root directory${NC}"
     exit 1
 fi
 
