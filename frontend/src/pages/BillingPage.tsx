@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/Card';
 import { ROUTES } from '../constants';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PaymentModal } from '../components/PaymentModal';
 import { BillingToggle } from '../components/BillingToggle';
 import { apiService } from '../services/api';
@@ -23,6 +23,7 @@ const FeatureItem = ({ children }: { children: string }) => (
 
 export function BillingPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'STARTER' | 'PROFESSIONAL' | 'BUSINESS' | null>(null);
   const [selectedBillingCycle, setSelectedBillingCycle] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY');
@@ -32,6 +33,31 @@ export function BillingPage() {
   useEffect(() => {
     loadSubscription();
   }, []);
+
+  // Handle plan query parameter after component mounts
+  useEffect(() => {
+    const planParam = searchParams.get('plan');
+    if (planParam && !isLoadingSubscription) {
+      // Auto-select plan if specified in URL
+      const planMap: Record<string, 'STARTER' | 'PROFESSIONAL' | 'BUSINESS'> = {
+        starter: 'STARTER',
+        professional: 'PROFESSIONAL',
+        business: 'BUSINESS',
+      };
+      
+      const plan = planMap[planParam.toLowerCase()];
+      if (plan) {
+        setSelectedPlan(plan);
+        setSelectedBillingCycle(selectedBillingCycle);
+        setShowPaymentModal(true);
+      }
+      
+      // Clean up URL params after processing
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('plan');
+      setSearchParams(newSearchParams, { replace: true });
+    }
+  }, [isLoadingSubscription, searchParams, setSearchParams, selectedBillingCycle]);
 
   async function loadSubscription() {
     try {

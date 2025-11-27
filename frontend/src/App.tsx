@@ -28,7 +28,10 @@ const ApiPage = lazy(() => import('./pages/ApiPage').then(m => ({ default: m.Api
 const AuthCallbackPage = lazy(() => import('./pages/AuthCallbackPage').then(m => ({ default: m.AuthCallbackPage })));
 const CliAuthPage = lazy(() => import('./pages/CliAuthPage').then(m => ({ default: m.CliAuthPage })));
 const CliGuidePage = lazy(() => import('./pages/CliGuidePage').then(m => ({ default: m.CliGuidePage })));
+const DocsPage = lazy(() => import('./pages/DocsPage').then(m => ({ default: m.DocsPage })));
+const FAQPage = lazy(() => import('./pages/FAQPage').then(m => ({ default: m.FAQPage })));
 const BillingPage = lazy(() => import('./pages/BillingPage').then(m => ({ default: m.BillingPage })));
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })));
 
 // Loading component
 const PageLoader = () => (
@@ -44,7 +47,7 @@ function App() {
   return (
     <Router>
       <GoogleAnalytics />
-      <div className="App">
+      <div className="App font-sans antialiased">
         <Suspense fallback={<PageLoader />}>
           <Routes>
           {/* Public routes */}
@@ -66,6 +69,8 @@ function App() {
           />
 
           <Route path={ROUTES.LANDING} element={<LandingPage />} />
+          <Route path={ROUTES.DOCS} element={<DocsPage />} />
+          <Route path={ROUTES.FAQ} element={<FAQPage />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/refund" element={<RefundPolicyPage />} />
@@ -144,6 +149,17 @@ function App() {
               <ProtectedRoute>
                 <AppLayout>
                   <BillingPage />
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path={ROUTES.SETTINGS}
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <SettingsPage />
                 </AppLayout>
               </ProtectedRoute>
             }

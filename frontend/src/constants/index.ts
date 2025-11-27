@@ -108,6 +108,8 @@ export const ROUTES = {
   SETTINGS: '/settings',
   CLI_AUTH: '/cli/auth',
   CLI_GUIDE: '/docs/cli',
+  DOCS: '/docs',
+  FAQ: '/faq',
   BILLING: '/billing',
   LANDING: '/',
 } as const;
