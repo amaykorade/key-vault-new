@@ -562,7 +562,7 @@ export function LandingPage() {
                 <span>30-day money-back guarantee</span>
               </li>
             </ul>
-            <Link to={`${ROUTES.BILLING}?plan=starter`} className="block">
+            <Link to={ROUTES.BILLING} className="block">
               <Button variant="gradient" size="lg" className="w-full mb-2">
                 Start Free Trial →
               </Button>
