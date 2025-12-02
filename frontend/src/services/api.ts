@@ -860,6 +860,150 @@ class ApiService {
     return this.request<{ authUrl: string }>(`/vercel/auth/redirect?${params.toString()}`);
   }
 
+  // Render Integration
+  async checkRenderStatus(organizationId: string): Promise<{ connected: boolean }> {
+    return this.request<{ connected: boolean }>(`/render/status/${organizationId}`);
+  }
+
+  async getRenderIntegrations(organizationId: string): Promise<{
+    integrations: Array<{
+      id: string;
+      name: string;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+  }> {
+    return this.request<{
+      integrations: Array<{
+        id: string;
+        name: string;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+    }>(`/render/integrations/${organizationId}`);
+  }
+
+  async getRenderServices(integrationId: string): Promise<{ services: any[] }> {
+    return this.request<{ services: any[] }>(`/render/services/${integrationId}`);
+  }
+
+  async connectRender(data: { 
+    apiKey: string; 
+    organizationId: string; 
+    name?: string;
+  }): Promise<{ 
+    success: boolean; 
+    message?: string;
+    integration?: { id: string; name: string };
+  }> {
+    return this.request<{ 
+      success: boolean; 
+      message?: string;
+      integration?: { id: string; name: string };
+    }>('/render/connect', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteRenderIntegration(integrationId: string): Promise<{ success: boolean; message?: string }> {
+    return this.request<{ success: boolean; message?: string }>(`/render/integrations/${integrationId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async syncToRender(data: {
+    projectId: string;
+    environment: string;
+    folder: string;
+    renderIntegrationId: string;
+    renderServiceId: string;
+    renderServiceName?: string;
+  }): Promise<{ success: boolean; synced: number; errors: string[]; message?: string }> {
+    return this.request<{ success: boolean; synced: number; errors: string[]; message?: string }>('/render/sync', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async checkRenderSyncStatus(projectId: string, environment: string, folder: string): Promise<{ hasUnsyncedChanges: boolean }> {
+    return this.request<{ hasUnsyncedChanges: boolean }>(`/render/sync-status/${projectId}/${environment}/${folder}`);
+  }
+
+  async getRenderSyncConfig(projectId: string, environment: string, folder: string): Promise<{
+    config: {
+      renderIntegrationId: string | null;
+      renderServiceId: string;
+      renderServiceName: string | null;
+      renderEnvGroup: string | null;
+      syncEnabled: boolean;
+      autoSync: boolean;
+      lastSyncedAt: string | null;
+      lastSyncStatus: string | null;
+      lastSyncError: string | null;
+    } | null;
+  }> {
+    return this.request<{
+      config: {
+        renderIntegrationId: string | null;
+        renderServiceId: string;
+        renderServiceName: string | null;
+        renderEnvGroup: string | null;
+        syncEnabled: boolean;
+        autoSync: boolean;
+        lastSyncedAt: string | null;
+        lastSyncStatus: string | null;
+        lastSyncError: string | null;
+      } | null;
+    }>(`/render/sync-config/${projectId}/${environment}/${folder}`);
+  }
+
+  async saveRenderSyncConfig(data: {
+    projectId: string;
+    environment: string;
+    folder: string;
+    renderIntegrationId: string;
+    renderServiceId: string;
+    renderServiceName?: string;
+    renderEnvGroup?: string;
+    syncEnabled?: boolean;
+    autoSync?: boolean;
+  }): Promise<{
+    success: boolean;
+    config: {
+      renderIntegrationId: string | null;
+      renderServiceId: string;
+      renderServiceName: string | null;
+      renderEnvGroup: string | null;
+      syncEnabled: boolean;
+      autoSync: boolean;
+    };
+  }> {
+    return this.request<{
+      success: boolean;
+      config: {
+        renderIntegrationId: string | null;
+        renderServiceId: string;
+        renderServiceName: string | null;
+        renderEnvGroup: string | null;
+        syncEnabled: boolean;
+        autoSync: boolean;
+      };
+    }>('/render/sync-config', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteRenderSyncConfig(projectId: string, environment: string, folder: string): Promise<{ success: boolean; message?: string }> {
+    return this.request<{ success: boolean; message?: string }>(
+      `/render/sync-config/${projectId}/${encodeURIComponent(environment)}/${encodeURIComponent(folder)}`,
+      {
+        method: 'DELETE',
+      }
+    );
+  }
+
   // Utility methods
   isAuthenticated(): boolean {
     return !!this.accessToken;

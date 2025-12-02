@@ -70,11 +70,16 @@ router.post('/projects/:projectId/secrets', requireAuth, async (req: AuthRequest
         }))
       });
     }
-    if (error instanceof Error && (
-      error.message === 'Access denied' ||
-      error.message.includes('Secret with name')
-    )) {
-      return res.status(400).json({ error: error.message });
+    if (error instanceof Error) {
+      if (
+        error.message === 'Access denied' ||
+        error.message.includes('Secret with name')
+      ) {
+        return res.status(400).json({ error: error.message });
+      }
+      if (error.message.startsWith('Free plan limit')) {
+        return res.status(403).json({ error: error.message });
+      }
     }
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -218,11 +223,16 @@ router.put('/:id', requireAuth, async (req: AuthRequest, res) => {
         }))
       });
     }
-    if (error instanceof Error && (
-      error.message === 'Access denied' ||
-      error.message.includes('Secret with name')
-    )) {
-      return res.status(400).json({ error: error.message });
+    if (error instanceof Error) {
+      if (
+        error.message === 'Access denied' ||
+        error.message.includes('Secret with name')
+      ) {
+        return res.status(400).json({ error: error.message });
+      }
+      if (error.message.startsWith('Free plan limit')) {
+        return res.status(403).json({ error: error.message });
+      }
     }
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -492,8 +502,13 @@ router.post('/projects/:projectId/secrets/import', requireAuth, async (req: Auth
     });
   } catch (error) {
     console.error('Bulk import error:', error);
-    if (error instanceof Error && error.message === 'Access denied') {
-      return res.status(403).json({ error: error.message });
+    if (error instanceof Error) {
+      if (error.message === 'Access denied') {
+        return res.status(403).json({ error: error.message });
+      }
+      if (error.message.startsWith('Free plan limit')) {
+        return res.status(403).json({ error: error.message });
+      }
     }
     res.status(500).json({ error: 'Internal server error' });
   }

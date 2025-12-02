@@ -158,6 +158,7 @@ app.use('/api/public', publicRoutes);
 // Vercel integration routes
 app.use('/api/vercel', vercelRoutes);
 app.use('/api/auth/vercel', vercelRoutes); // OAuth callback
+
 app.use('/api', cliRoutes);
 
 // Payment routes

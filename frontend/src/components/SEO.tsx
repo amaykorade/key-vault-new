@@ -102,7 +102,7 @@ export function getOrganizationSchema() {
     '@type': 'Organization',
     name: 'APIVault',
     url: siteUrl,
-    logo: `${siteUrl}/logo.png`,
+    logo: `${siteUrl}/logo.svg`,
     description: defaultDescription,
     sameAs: [
       // Add social media links when available

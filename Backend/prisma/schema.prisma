@@ -31,6 +31,7 @@ model User {
   teamMemberships    TeamMembership[]
   apiTokens          UserApiToken[]
   vercelIntegrations VercelIntegration[]
+  renderIntegrations RenderIntegration[]
   subscriptions      Subscription[]
 
   @@index([email])
@@ -89,6 +90,7 @@ model Organization {
   projects           Project[]
   teams              Team[]
   vercelIntegrations VercelIntegration[]
+  renderIntegrations RenderIntegration[]
 
   @@index([ownerId])
   @@index([slug])
@@ -119,6 +121,7 @@ model Project {
   auditLogs      AuditLog[]
   folders        Folder[]
   vercelSyncs    FolderVercelSync[]
+  renderSyncs    FolderRenderSync[]
   organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   apiKeys        ProjectApiKey[]
   members        ProjectMember[]
@@ -365,6 +368,48 @@ model FolderVercelSync {
   @@index([projectId])
   @@index([vercelProjectId])
   @@index([vercelIntegrationId])
+}
+
+model RenderIntegration {
+  id              String            @id @default(uuid())
+  userId          String
+  organizationId  String
+  renderApiKey    String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  name            String            @default("Default")
+  syncs           FolderRenderSync[]
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([userId, organizationId])
+}
+
+model FolderRenderSync {
+  id                  String            @id @default(uuid())
+  projectId           String
+  environment         String
+  folder              String
+  renderServiceId     String
+  renderServiceName   String?
+  renderEnvGroup      String?           // Optional environment group name
+  syncEnabled         Boolean           @default(true)
+  autoSync            Boolean           @default(false)
+  lastSyncedAt        DateTime?
+  lastSyncStatus      String?
+  lastSyncError       String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  renderIntegrationId String?
+  project             Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  renderIntegration   RenderIntegration? @relation(fields: [renderIntegrationId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, environment, folder])
+  @@index([projectId])
+  @@index([renderServiceId])
+  @@index([renderIntegrationId])
 }
 
 model CliToken {

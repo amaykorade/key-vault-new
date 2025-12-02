@@ -29,7 +29,7 @@ export function LandingPage() {
     },
     { 
       question: 'What\'s the difference between Free and Pro plans?', 
-      answer: 'The Free plan is perfect for solo developers with up to 50 API keys across 3 projects. It includes CLI/API access and 30 days of audit logs. The Pro plan ($9/month) gives you unlimited keys and projects, Vercel integration, 1-year audit log retention, priority support, and higher API rate limits. See our full pricing comparison at /pricing.' 
+      answer: 'The Free plan is perfect for solo developers with up to 5 API keys across 1 project. It includes CLI/API access and 30 days of audit logs. The Pro plan ($9/month) gives you unlimited keys and projects, Vercel integration, 1-year audit log retention, priority support, and higher API rate limits. See our full pricing comparison at /pricing.' 
     },
     { 
       question: 'Is my data secure?', 
@@ -478,11 +478,11 @@ export function LandingPage() {
             <ul className="space-y-3 mb-8 text-sm text-gray-300">
               <li className="flex items-start gap-2">
                 {CHECK_ICON}
-                <span>Up to 50 API keys</span>
+                <span>Up to 5 API keys</span>
               </li>
               <li className="flex items-start gap-2">
                 {CHECK_ICON}
-                <span>3 projects</span>
+                <span>1 project</span>
               </li>
               <li className="flex items-start gap-2">
                 {CHECK_ICON}

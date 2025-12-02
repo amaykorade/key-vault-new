@@ -2,6 +2,8 @@ import { db } from '../lib/db';
 import { z } from 'zod';
 import { AccessControlService } from './access-control';
 
+type SubscriptionPlan = 'FREE' | 'STARTER' | 'PROFESSIONAL' | 'BUSINESS';
+
 export const ProjectSchema = {
   create: z.object({
     name: z.string().min(1, 'Project name is required'),
@@ -29,6 +31,36 @@ export class ProjectService {
 
     if (!membership) {
       throw new Error('Access denied: You must be a member of the organization');
+    }
+
+    // Enforce free plan limits: max 1 project per organization for org owner on Free plan
+    const organization = await db.organization.findUnique({
+      where: { id: organizationId },
+      select: {
+        ownerId: true,
+      },
+    });
+
+    if (!organization) {
+      throw new Error('Organization not found');
+    }
+
+    const subscription = await db.subscription.findFirst({
+      where: { userId: organization.ownerId },
+    });
+
+    const plan: SubscriptionPlan = (subscription?.plan as SubscriptionPlan) || 'FREE';
+
+    if (plan === 'FREE') {
+      const projectCount = await db.project.count({
+        where: { organizationId },
+      });
+
+      if (projectCount >= 1) {
+        throw new Error(
+          'Free plan limit: You can create up to 1 project per organization on the Free plan. Please upgrade your plan to create more projects.'
+        );
+      }
     }
 
     // Create project and automatically add creator as OWNER

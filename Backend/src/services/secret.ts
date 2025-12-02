@@ -5,6 +5,8 @@ import { AccessControlService } from './access-control';
 import { FolderService } from './folder';
 import { detectSecretType } from '../lib/env-parser';
 
+type SubscriptionPlan = 'FREE' | 'STARTER' | 'PROFESSIONAL' | 'BUSINESS';
+
 export const SecretSchema = {
   create: z.object({
     name: z.string().min(1, 'Secret name is required').max(100, 'Secret name too long'),
@@ -25,6 +27,38 @@ export const SecretSchema = {
 };
 
 export class SecretService {
+  /**
+   * Get billing context for a project (organization + whether owner is on Free plan)
+   */
+  private static async getProjectBillingContext(projectId: string): Promise<{ organizationId: string; isFreePlan: boolean }> {
+    const project = await db.project.findUnique({
+      where: { id: projectId },
+      select: {
+        organizationId: true,
+        organization: {
+          select: {
+            ownerId: true,
+          },
+        },
+      },
+    });
+
+    if (!project || !project.organization) {
+      throw new Error('Project not found');
+    }
+
+    const subscription = await db.subscription.findFirst({
+      where: { userId: project.organization.ownerId },
+    });
+
+    const plan: SubscriptionPlan = (subscription?.plan as SubscriptionPlan) || 'FREE';
+
+    return {
+      organizationId: project.organizationId,
+      isFreePlan: plan === 'FREE',
+    };
+  }
+
   // Create secret in project
   static async createSecret(projectId: string, userId: string, data: z.infer<typeof SecretSchema.create>) {
     console.log('SecretService.createSecret called with:', { projectId, userId, data });
@@ -36,6 +70,34 @@ export class SecretService {
     
     if (!canWrite) {
       throw new Error('Access denied: You need WRITE permission to create secrets');
+    }
+
+    // Enforce free plan limits for the project's organization
+    const billingContext = await this.getProjectBillingContext(projectId);
+
+    if (billingContext.isFreePlan) {
+      // Development environment only
+      const normalizedEnv = data.environment.toLowerCase();
+      if (normalizedEnv !== 'development') {
+        throw new Error(
+          'Free plan limit: Only the "development" environment is available on the Free plan. Please use the development environment or upgrade your plan.'
+        );
+      }
+
+      // Max 5 secrets across all projects in the organization
+      const totalSecretsInOrg = await db.secret.count({
+        where: {
+          project: {
+            organizationId: billingContext.organizationId,
+          },
+        },
+      });
+
+      if (totalSecretsInOrg >= 5) {
+        throw new Error(
+          'Free plan limit: You can store up to 5 secrets across all projects in this organization on the Free plan. Please upgrade your plan to store more secrets.'
+        );
+      }
     }
 
     // Check if secret name already exists in project for the same environment and folder
@@ -171,6 +233,17 @@ export class SecretService {
     const canWrite = await AccessControlService.canWrite(userId, secret.projectId);
     if (!canWrite) {
       throw new Error('Access denied: You need WRITE permission to update secrets');
+    }
+
+    // Enforce free plan environment restriction when updating
+    const billingContext = await this.getProjectBillingContext(secret.projectId);
+    if (billingContext.isFreePlan) {
+      const targetEnvironment = (data.environment || secret.environment).toLowerCase();
+      if (targetEnvironment !== 'development') {
+        throw new Error(
+          'Free plan limit: Only the "development" environment is available on the Free plan. Please use the development environment or upgrade your plan.'
+        );
+      }
     }
 
     // Check if new name conflicts with existing secret (if name is being updated)
@@ -418,6 +491,40 @@ export class SecretService {
     const canWrite = await AccessControlService.canWrite(userId, projectId);
     if (!canWrite) {
       throw new Error('Access denied: You need WRITE permission to import secrets');
+    }
+
+    // Enforce free plan limits for the project's organization
+    const billingContext = await this.getProjectBillingContext(projectId);
+
+    if (billingContext.isFreePlan) {
+      // Development environment only
+      const normalizedEnv = environment.toLowerCase();
+      if (normalizedEnv !== 'development') {
+        throw new Error(
+          'Free plan limit: Only the "development" environment is available on the Free plan. Please use the development environment or upgrade your plan.'
+        );
+      }
+
+      // Max 5 secrets across all projects in the organization (approximate for imports)
+      const existingSecretCount = await db.secret.count({
+        where: {
+          project: {
+            organizationId: billingContext.organizationId,
+          },
+        },
+      });
+
+      if (existingSecretCount >= 5) {
+        throw new Error(
+          'Free plan limit: You can store up to 5 secrets across all projects in this organization on the Free plan. Please upgrade your plan to store more secrets.'
+        );
+      }
+
+      if (existingSecretCount + secrets.length > 5) {
+        throw new Error(
+          'Free plan limit: This import would exceed the 5-secret limit across all projects in this organization on the Free plan. Please reduce the number of secrets or upgrade your plan.'
+        );
+      }
     }
 
     // Ensure folder exists

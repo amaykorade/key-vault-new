@@ -1,6 +1,8 @@
 import { db } from '../lib/db';
 import { z } from 'zod';
 
+type SubscriptionPlan = 'FREE' | 'STARTER' | 'PROFESSIONAL' | 'BUSINESS';
+
 export const OrganizationSchema = {
   create: z.object({
     name: z.string().min(1, 'Organization name is required'),
@@ -22,6 +24,25 @@ export const OrganizationSchema = {
 export class OrganizationService {
   // Create organization and make user the owner
   static async createOrganization(userId: string, data: z.infer<typeof OrganizationSchema.create>) {
+    // Enforce free plan limits: only 1 organization per user as OWNER
+    const subscription = await db.subscription.findFirst({
+      where: { userId },
+    });
+
+    const plan: SubscriptionPlan = (subscription?.plan as SubscriptionPlan) || 'FREE';
+
+    if (plan === 'FREE') {
+      const ownedOrgCount = await db.organization.count({
+        where: { ownerId: userId },
+      });
+
+      if (ownedOrgCount >= 1) {
+        throw new Error(
+          'Free plan limit: You can own only 1 organization on the Free plan. Please upgrade your plan to own more organizations.'
+        );
+      }
+    }
+
     const slug = this.generateSlug(data.name);
     
     return await db.$transaction(async (tx) => {

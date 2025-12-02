@@ -33,8 +33,16 @@ router.post('/organizations/:organizationId/projects', requireAuth, async (req: 
         }))
       });
     }
-    if (error instanceof Error && error.message === 'Access denied') {
-      return res.status(403).json({ error: 'Access denied' });
+    if (error instanceof Error) {
+      if (error.message === 'Access denied') {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      if (error.message === 'Organization not found') {
+        return res.status(404).json({ error: 'Organization not found' });
+      }
+      if (error.message.startsWith('Free plan limit')) {
+        return res.status(403).json({ error: error.message });
+      }
     }
     res.status(500).json({ error: 'Internal server error' });
   }

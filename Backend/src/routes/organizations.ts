@@ -19,8 +19,10 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
         createdAt: organization.createdAt,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Create organization error:', error);
+
+    // Validation error
     if (error instanceof Error && error.name === 'ZodError') {
       const zodError = error as any;
       return res.status(400).json({ 
@@ -31,6 +33,21 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
         }))
       });
     }
+
+    // Free plan restriction
+    if (error instanceof Error && error.message.startsWith('Free plan limit')) {
+      return res.status(403).json({ 
+        error: error.message,
+      });
+    }
+
+    // Handle unique slug constraint (Prisma P2002)
+    if (error?.code === 'P2002' && Array.isArray(error?.meta?.target) && error.meta.target.includes('slug')) {
+      return res.status(400).json({
+        error: 'A workspace with a similar name already exists. Please choose a different name.',
+      });
+    }
+
     res.status(500).json({ error: 'Internal server error' });
   }
 });

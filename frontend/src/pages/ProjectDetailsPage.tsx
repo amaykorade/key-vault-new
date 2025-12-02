@@ -9,7 +9,7 @@ import { SecretModal } from '../components/forms/SecretModal';
 import { ProjectMembersSection } from '../components/ProjectMembersSection';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { EnvironmentColumn } from '../components/EnvironmentColumn';
-import { apiService } from '../services/api';
+import { apiService, ApiError } from '../services/api';
 import { useAuthStore } from '../stores/auth';
 import toast from 'react-hot-toast';
 import type { Project, Secret, Folder } from '../types';
@@ -409,8 +409,15 @@ export function ProjectDetailsPage() {
       setPreselectedEnvironment(null);
       setPreselectedFolder(null);
     } catch (err: any) {
-      const errorMsg = err.response?.data?.error || 'Failed to create secret';
-      toast.error(errorMsg);
+      if (err instanceof ApiError && err.status === 403 && typeof err.message === 'string' && err.message.startsWith('Free plan limit')) {
+        toast.error(
+          'Free plan limit reached: You can only use the development environment and up to 5 secrets per workspace. Upgrade in Billing to unlock more.',
+          { duration: 10000 }
+        );
+      } else {
+        const errorMsg = (err as any)?.response?.data?.error || err?.message || 'Failed to create secret';
+        toast.error(errorMsg, { duration: 5000 });
+      }
     } finally {
       setIsCreatingSecret(false);
     }

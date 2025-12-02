@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { apiService } from '../services/api';
+import { apiService, ApiError } from '../services/api';
 import { InviteOrganizationMemberModal } from '../components/InviteOrganizationMemberModal';
 import { OrganizationMembersSection } from '../components/OrganizationMembersSection';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
@@ -204,7 +204,11 @@ export function OrganizationDetailsPage() {
       setShowCreateProjectModal(false);
       await fetchProjects();
     } catch (err: any) {
-      setError(err.message || 'Failed to create project');
+      if (err instanceof ApiError && err.status === 403 && err.message.startsWith('Free plan limit')) {
+        setError('Free plan limit reached: You can only create 1 project per workspace on the Free plan. Upgrade in Billing to create more.');
+      } else {
+        setError(err.message || 'Failed to create project');
+      }
       throw err;
     } finally {
       setIsCreatingProject(false);

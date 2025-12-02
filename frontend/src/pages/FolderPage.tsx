@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table';
 import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/Select';
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/Tabs';
 import { SecretRow } from '../components/SecretRow';
@@ -11,10 +12,13 @@ import { SecretForm } from '../components/forms/SecretForm';
 import { SecretModal } from '../components/forms/SecretModal';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { EnvImportModal } from '../components/EnvImportModal';
-import { apiService } from '../services/api';
+import { apiService, ApiError } from '../services/api';
 import type { Project, Secret } from '../types';
 
 type Tab = 'secrets' | 'access' | 'logs' | 'integrations';
+
+// Temporary feature flag: disable Render sync while integration is unstable
+const RENDER_SYNC_ENABLED = false;
 
 function getTimeAgo(dateString: string): string {
   const date = new Date(dateString);
@@ -203,6 +207,7 @@ export function FolderPage() {
   
   // Vercel integration state
   const [vercelConnected, setVercelConnected] = useState(false);
+  const [renderConnected, setRenderConnected] = useState(false);
   const [vercelIntegrations, setVercelIntegrations] = useState<Array<{
     id: string;
     name: string;
@@ -218,9 +223,24 @@ export function FolderPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
+  const [showAddSyncModal, setShowAddSyncModal] = useState(false);
+  const [isLoadingVercelSync, setIsLoadingVercelSync] = useState(false);
+  const [isLoadingRenderSync, setIsLoadingRenderSync] = useState(false);
   const [vercelToken, setVercelToken] = useState('');
   const [vercelIntegrationName, setVercelIntegrationName] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
+  
+  // Render state
+  const [renderIntegrations, setRenderIntegrations] = useState<any[]>([]);
+  const [renderServices, setRenderServices] = useState<any[]>([]);
+  const [selectedRenderIntegration, setSelectedRenderIntegration] = useState<string>('');
+  const [selectedRenderService, setSelectedRenderService] = useState<string>('');
+  const [showRenderConnectModal, setShowRenderConnectModal] = useState(false);
+  const [showRenderConfigModal, setShowRenderConfigModal] = useState(false);
+  const [renderApiKey, setRenderApiKey] = useState('');
+  const [renderIntegrationName, setRenderIntegrationName] = useState('');
+  const [isConnectingRender, setIsConnectingRender] = useState(false);
+  const [isSavingRenderConfig, setIsSavingRenderConfig] = useState(false);
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [isDeletingIntegration, setIsDeletingIntegration] = useState<string | null>(null);
   const [isDeletingSyncConfig, setIsDeletingSyncConfig] = useState(false);
@@ -228,6 +248,7 @@ export function FolderPage() {
   const [syncResult, setSyncResult] = useState<{ synced: number; projectName: string; envTarget: string } | null>(null);
   const [isTriggeringDeploy, setIsTriggeringDeploy] = useState(false);
   const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(false);
+  const [expandedSyncId, setExpandedSyncId] = useState<string | null>(null);
 
   const filteredLogs = useMemo(() => {
     let filtered = logs;
@@ -341,6 +362,9 @@ const breadcrumbItems = useMemo(() => {
       fetchLogs();
     } else if (activeTab === 'integrations') {
       checkVercelConnection();
+      if (RENDER_SYNC_ENABLED) {
+        checkRenderConnection();
+      }
     }
   }, [activeTab]);
 
@@ -459,6 +483,126 @@ const breadcrumbItems = useMemo(() => {
     }
   }
 
+  async function checkRenderConnection() {
+    if (!id || !env || !folder) return;
+    
+    try {
+      // Get project to find organizationId
+      const projectRes = await apiService.getProject(id);
+      const orgId = projectRes.project?.organizationId;
+      
+      if (!orgId) {
+        console.error('Could not determine organization ID');
+        return;
+      }
+      
+      const data = await apiService.checkRenderStatus(orgId);
+      setRenderConnected(data.connected || false);
+      
+      // If connected, fetch integrations and load saved sync config
+      if (data.connected) {
+        try {
+          const integrationsData = await apiService.getRenderIntegrations(orgId);
+          setRenderIntegrations(integrationsData.integrations || []);
+          
+          const configData = await apiService.getRenderSyncConfig(id, env, folder || 'default');
+          if (configData.config) {
+            // Load service from saved config
+            if (configData.config.renderServiceId) {
+              setSelectedRenderService(configData.config.renderServiceId);
+            }
+            
+            // If integration ID exists, use it; otherwise use first integration
+            if (configData.config.renderIntegrationId) {
+              setSelectedRenderIntegration(configData.config.renderIntegrationId);
+              try {
+                const servicesData = await apiService.getRenderServices(configData.config.renderIntegrationId);
+                setRenderServices(servicesData.services || []);
+              } catch (servicesError) {
+                console.error('Failed to load Render services:', servicesError);
+              }
+            } else if (integrationsData.integrations.length > 0) {
+              const firstIntegration = integrationsData.integrations[0];
+              setSelectedRenderIntegration(firstIntegration.id);
+              try {
+                const servicesData = await apiService.getRenderServices(firstIntegration.id);
+                setRenderServices(servicesData.services || []);
+              } catch (servicesError) {
+                console.error('Failed to load Render services:', servicesError);
+              }
+            }
+          } else if (integrationsData.integrations.length > 0) {
+            // If no config but integrations exist, use the first one
+            const firstIntegration = integrationsData.integrations[0];
+            setSelectedRenderIntegration(firstIntegration.id);
+            try {
+              const servicesData = await apiService.getRenderServices(firstIntegration.id);
+              setRenderServices(servicesData.services || []);
+            } catch (servicesError) {
+              console.error('Failed to load Render services:', servicesError);
+            }
+          }
+        } catch (configError) {
+          console.error('Failed to load Render integrations or sync config:', configError);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to check Render connection:', e);
+    }
+  }
+
+  async function loadRenderServices(integrationId: string) {
+    try {
+      const servicesData = await apiService.getRenderServices(integrationId);
+      setRenderServices(servicesData.services || []);
+    } catch (error) {
+      console.error('Failed to load Render services:', error);
+      setRenderServices([]);
+    }
+  }
+
+  const handleVercelSyncClick = async () => {
+    setIsLoadingVercelSync(true);
+    setShowAddSyncModal(false);
+    
+    try {
+      // Small delay to ensure modal closes before opening next one
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // If Vercel is not connected, show connect modal, otherwise show config modal
+      if (!vercelConnected) {
+        setShowConnectModal(true);
+      } else {
+        // Load config and show config modal
+        if (id && env && folder) {
+          try {
+            const configData = await apiService.getVercelSyncConfig(id, env, folder || 'default');
+            if (configData.config) {
+              setSelectedVercelIntegration(configData.config.vercelIntegrationId || '');
+              setSelectedVercelProject(configData.config.vercelProjectId);
+              setVercelEnvTarget(configData.config.vercelEnvTarget);
+              if (configData.config.vercelIntegrationId) {
+                await loadVercelProjects(configData.config.vercelIntegrationId);
+              }
+            }
+          } catch (error) {
+            console.error('Failed to load sync config:', error);
+          }
+          setShowConfigModal(true);
+        } else {
+          // Auto-select first integration if not already selected and only one exists
+          if (vercelIntegrations.length === 1 && !selectedVercelIntegration) {
+            setSelectedVercelIntegration(vercelIntegrations[0].id);
+            loadVercelProjects(vercelIntegrations[0].id);
+          }
+          setShowConfigModal(true);
+        }
+      }
+    } finally {
+      setIsLoadingVercelSync(false);
+    }
+  };
+
   async function fetchSecrets() {
     if (!id) return;
     try {
@@ -475,9 +619,21 @@ const breadcrumbItems = useMemo(() => {
   async function handleCreateSecret(data: any) {
     if (!id) return;
     const payload = { ...data, environment: env, folder: folder || 'default' };
-    await apiService.createSecret(id, payload);
-    await fetchSecrets();
-    setShowCreateSecret(false);
+    try {
+      await apiService.createSecret(id, payload);
+      await fetchSecrets();
+      setShowCreateSecret(false);
+    } catch (err: any) {
+      if (err instanceof ApiError && err.status === 403 && typeof err.message === 'string' && err.message.startsWith('Free plan limit')) {
+        toast.error(
+          'Free plan limit reached: You can only use the development environment and up to 5 secrets per workspace. Upgrade in Billing to unlock more.',
+          { duration: 10000 }
+        );
+      } else {
+        const errorMsg = (err as any)?.response?.data?.error || err?.message || 'Failed to create secret';
+        toast.error(errorMsg, { duration: 5000 });
+      }
+    }
   }
 
   async function handleQuickCreateSecret() {
@@ -504,8 +660,17 @@ const breadcrumbItems = useMemo(() => {
       if (vercelConnected) {
         setTimeout(() => checkSyncStatus(), 100);
       }
-    } catch (e) {
-      console.error('Failed to create secret:', e);
+    } catch (err: any) {
+      console.error('Failed to create secret:', err);
+      if (err instanceof ApiError && err.status === 403 && typeof err.message === 'string' && err.message.startsWith('Free plan limit')) {
+        toast.error(
+          'Free plan limit reached: You can only use the development environment and up to 5 secrets per workspace. Upgrade in Billing to unlock more.',
+          { duration: 10000 }
+        );
+      } else {
+        const errorMsg = (err as any)?.response?.data?.error || err?.message || 'Failed to create secret';
+        toast.error(errorMsg, { duration: 5000 });
+      }
     }
   }
 
@@ -770,7 +935,7 @@ const breadcrumbItems = useMemo(() => {
             }`}
           >
             <span className="flex items-center gap-2">
-              Connected Syncs
+              Sync Configuration
               {vercelConnected && hasUnsyncedChanges && (
                 <>
                   <svg 
@@ -1416,7 +1581,7 @@ const breadcrumbItems = useMemo(() => {
                   <svg className="w-4 h-4 inline mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  Connected Syncs
+                  Sync Configuration
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -1571,117 +1736,70 @@ const breadcrumbItems = useMemo(() => {
         </Card>
       )}
 
-      {/* Connected Syncs Tab */}
+      {/* Sync Configuration Tab */}
       {activeTab === 'integrations' && (
         <div className="space-y-6">
-          {/* Syncs Configuration Card */}
+          {/* Add Sync Button */}
           <Card className="hover-lift">
             <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <div>
               <CardTitle className="text-white text-sm font-semibold">Sync Configuration</CardTitle>
+                <p className="text-xs text-gray-400 mt-1">Connect your secrets to external platforms</p>
+                </div>
+              <button
+                onClick={() => setShowAddSyncModal(true)}
+                className="px-3 py-2 text-xs rounded-md bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-500/50 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Sync
+              </button>
             </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Manual Redeploy Warning (MVP Notice) */}
-            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <div className="flex-1">
-                  <h4 className="text-sm font-semibold text-yellow-400 mb-1">⚠️ Manual Redeployment Required (For Now)</h4>
-                  <p className="text-xs text-gray-300 leading-relaxed mb-2">
-                    After syncing secrets to Vercel, you currently need to <strong className="text-white">manually redeploy from your Vercel dashboard</strong> for changes to take effect.
-                  </p>
-                  <p className="text-xs text-gray-400 bg-gray-800/50 rounded px-2 py-1.5 inline-block">
-                    🚀 <strong className="text-emerald-400">Coming Soon:</strong> Automatic redeployment after sync - no manual work needed!
-                  </p>
-                </div>
-              </div>
-            </div>
+          </Card>
 
-            {/* Unsynced Changes Warning */}
-            {vercelConnected && hasUnsyncedChanges && (
-              <div className="flex items-start gap-3 p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg animate-pulse">
-                <svg className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <div className="flex-1">
-                  <h4 className="text-sm font-semibold text-orange-400 mb-1">Unsynced Changes</h4>
-                  <p className="text-xs text-gray-300">
-                    You have made changes to your secrets. Trigger a sync below to push the latest changes.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Syncs Table */}
-            {vercelConnected ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Integration</TableHead>
-                    <TableHead>Destination</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {/* Vercel Sync Row */}
-                  <TableRow className="group">
-                    <TableCell>
-                      <div className="flex items-center gap-2">
+          {/* Connected Syncs List */}
+          <div className="space-y-3">
+            {/* Show connected syncs - only show if sync is actually configured */}
+            {((vercelConnected && selectedVercelIntegration && selectedVercelProject) || 
+              (renderConnected && selectedRenderIntegration && selectedRenderService)) ? (
+              <div className="space-y-3">
+                {/* Vercel Sync Card */}
+                {vercelConnected && selectedVercelIntegration && selectedVercelProject && (
+                <Card 
+                  className={`border-gray-800 hover:border-emerald-500/40 transition-all cursor-pointer ${
+                    expandedSyncId === 'vercel' ? 'border-emerald-500/50' : ''
+                  }`}
+                  onClick={() => {
+                    setExpandedSyncId(expandedSyncId === 'vercel' ? null : 'vercel');
+                  }}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-lg flex items-center justify-center flex-shrink-0">
                         <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M12 2L2 22h20L12 2z" />
                         </svg>
-                        <span className="text-sm font-medium text-white">Vercel</span>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm text-gray-300">
+                        <div className="flex-1">
+                          <h3 className="text-sm font-semibold text-white">Vercel Sync</h3>
+                          <p className="text-xs text-gray-400 mt-0.5">
                         {selectedVercelIntegration && selectedVercelProject ? (
                           (() => {
                             const integration = vercelIntegrations.find(i => i.id === selectedVercelIntegration);
                             const project = vercelProjects.find(p => p.id === selectedVercelProject);
-                            return integration && project ? (
-                              <div className="flex flex-col gap-1">
-                                <span className="font-medium text-white">{integration.name}</span>
-                                <span className="text-xs text-gray-400">{project.name}</span>
-                              </div>
-                            ) : (
-                              <span className="text-gray-500">Configuration incomplete</span>
-                            );
+                                return integration && project 
+                                  ? `${integration.name} → ${project.name} (${vercelEnvTarget})`
+                                  : 'Not configured';
                           })()
                         ) : (
-                          <span className="text-gray-500">Not configured</span>
+                              'Not configured'
                         )}
+                          </p>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        {selectedVercelIntegration && selectedVercelProject ? (
-                          (() => {
-                            const integration = vercelIntegrations.find(i => i.id === selectedVercelIntegration);
-                            const project = vercelProjects.find(p => p.id === selectedVercelProject);
-                            return integration && project ? (
-                              <div className="flex items-center gap-2 text-gray-300">
-                                <span className="font-medium text-white">{integration.name}</span>
-                                <span className="text-gray-500">→</span>
-                                <span className="font-medium text-white">{project.name}</span>
-                                <span className="text-gray-500">/</span>
-                                <span className="capitalize text-gray-300">{vercelEnvTarget}</span>
-                                <span className="text-gray-500">/</span>
-                                <span className="text-gray-400">Encrypted</span>
                               </div>
-                            ) : (
-                              <span className="text-gray-500">Configuration incomplete</span>
-                            );
-                          })()
-                        ) : (
-                          <span className="text-gray-500">Not configured</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
+                      <div className="flex items-center gap-3">
                       {hasUnsyncedChanges ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-medium rounded-full">
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1689,17 +1807,62 @@ const breadcrumbItems = useMemo(() => {
                           </svg>
                           Out of sync
                         </span>
-                      ) : (
+                        ) : selectedVercelIntegration && selectedVercelProject ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium rounded-full">
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
                           Synced
                         </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
+                        ) : null}
+                        <svg 
+                          className={`w-5 h-5 text-gray-400 transition-transform ${
+                            expandedSyncId === 'vercel' ? 'rotate-180' : ''
+                          }`} 
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  
+                  {/* Expanded Content */}
+                  {expandedSyncId === 'vercel' && (
+                    <CardContent className="pt-0 space-y-4 border-t border-gray-800">
+                      {/* Configuration Details */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs text-gray-400 mb-1 block">Integration</label>
+                          <p className="text-sm text-white">
+                            {selectedVercelIntegration ? (
+                              vercelIntegrations.find(i => i.id === selectedVercelIntegration)?.name || 'Not configured'
+                            ) : (
+                              'Not configured'
+                            )}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 mb-1 block">Destination</label>
+                          <p className="text-sm text-white">
+                            {selectedVercelIntegration && selectedVercelProject ? (
+                              (() => {
+                                const project = vercelProjects.find(p => p.id === selectedVercelProject);
+                                return project 
+                                  ? `${project.name} (${vercelEnvTarget})`
+                                  : 'Not configured';
+                              })()
+                            ) : (
+                              'Not configured'
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-800" onClick={(e) => e.stopPropagation()}>
                         {selectedVercelIntegration && selectedVercelProject ? (
                           <>
                             <button
@@ -1729,7 +1892,7 @@ const breadcrumbItems = useMemo(() => {
                                 }
                               }}
                               disabled={isDeletingSyncConfig}
-                              className="px-3 py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="px-3 py-2 text-xs rounded-md border border-gray-700 text-red-400 hover:text-red-300 hover:bg-red-500/10 hover:border-red-500/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               title="Disconnect sync"
                             >
                               {isDeletingSyncConfig ? 'Disconnecting...' : 'Disconnect'}
@@ -1757,7 +1920,7 @@ const breadcrumbItems = useMemo(() => {
                                 // Open configuration modal
                                 setShowConfigModal(true);
                               }}
-                              className="px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-800 rounded transition-colors"
+                              className="px-3 py-2 text-xs rounded-md border border-gray-700 text-gray-300 hover:bg-gray-800 transition-colors"
                               title="Configure sync"
                             >
                               Configure
@@ -1831,7 +1994,7 @@ const breadcrumbItems = useMemo(() => {
                                 }
                               }}
                               disabled={!selectedVercelIntegration || !selectedVercelProject || vercelProjects.length === 0 || isSyncing}
-                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="px-3 py-2 text-xs rounded-md bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
                               {isSyncing ? (
                                 <span className="flex items-center gap-1.5">
@@ -1869,20 +2032,275 @@ const breadcrumbItems = useMemo(() => {
                               // Open configuration modal
                               setShowConfigModal(true);
                             }}
-                            className="px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-gray-800 rounded transition-colors"
+                            className="px-3 py-2 text-xs rounded-md border border-gray-700 text-gray-300 hover:bg-gray-800 transition-colors"
                             title="Configure sync"
                           >
                             Configure
                           </button>
                         )}
                       </div>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+                    </CardContent>
+                  )}
+                </Card>
+                )}
+
+                {/* Render Sync Card - temporarily disabled via RENDER_SYNC_ENABLED flag */}
+                {RENDER_SYNC_ENABLED && renderConnected && selectedRenderIntegration && selectedRenderService && (
+                  <Card 
+                    className={`border-gray-800 hover:border-emerald-500/40 transition-all cursor-pointer ${
+                      expandedSyncId === 'render' ? 'border-emerald-500/50' : ''
+                    }`}
+                    onClick={() => {
+                      setExpandedSyncId(expandedSyncId === 'render' ? null : 'render');
+                    }}
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M12 2L2 7v10l10 5 10-5V7L12 2zm0 2.18l8 4v8.36l-8-4V4.18z" />
+                            </svg>
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-sm font-semibold text-white">Render Sync</h3>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {selectedRenderIntegration && selectedRenderService ? (
+                                (() => {
+                                  const integration = renderIntegrations.find(i => i.id === selectedRenderIntegration);
+                                  const service = renderServices.find((s: any) => (s.id || s.service?.id) === selectedRenderService);
+                                  const serviceName = service?.name || service?.service?.name || service?.serviceDetails?.name || 'Unknown Service';
+                                  return integration && service 
+                                    ? `${integration.name} → ${serviceName}`
+                                    : 'Not configured';
+                                })()
+                              ) : (
+                                'Not configured'
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {selectedRenderIntegration && selectedRenderService ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium rounded-full">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Configured
+                            </span>
+                          ) : null}
+                          <svg 
+                            className={`w-5 h-5 text-gray-400 transition-transform ${
+                              expandedSyncId === 'render' ? 'rotate-180' : ''
+                            }`} 
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    
+                    {/* Expanded Content */}
+                    {expandedSyncId === 'render' && (
+                      <CardContent className="pt-0 space-y-4 border-t border-gray-800">
+                        {/* Configuration Details */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-xs text-gray-400 mb-1 block">Integration</label>
+                            <p className="text-sm text-white">
+                              {selectedRenderIntegration ? (
+                                renderIntegrations.find(i => i.id === selectedRenderIntegration)?.name || 'Not configured'
+                              ) : (
+                                'Not configured'
+                              )}
+                            </p>
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-400 mb-1 block">Destination</label>
+                            <p className="text-sm text-white">
+                              {selectedRenderService ? (
+                                (() => {
+                                  const service = renderServices.find((s: any) => (s.id || s.service?.id) === selectedRenderService);
+                                  return service?.name || service?.service?.name || service?.serviceDetails?.name || 'Unknown Service';
+                                })()
+                              ) : (
+                                'Not configured'
+                              )}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-800" onClick={(e) => e.stopPropagation()}>
+                          {selectedRenderIntegration && selectedRenderService ? (
+                            <>
+                              <button
+                                onClick={async () => {
+                                  if (!id || !env || !folder) {
+                                    toast.error('Invalid project, environment, or folder');
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    setIsDeletingSyncConfig(true);
+                                    await apiService.deleteRenderSyncConfig(id, env, folder || 'default');
+                                    setSelectedRenderIntegration('');
+                                    setSelectedRenderService('');
+                                    setRenderServices([]);
+                                    await checkRenderConnection();
+                                    await fetchLogs();
+                                    toast.success('Sync configuration deleted successfully');
+                                  } catch (error) {
+                                    console.error('Failed to delete sync config:', error);
+                                    toast.error('Failed to delete sync configuration. Please try again.');
+                                  } finally {
+                                    setIsDeletingSyncConfig(false);
+                                  }
+                                }}
+                                disabled={isDeletingSyncConfig}
+                                className="px-3 py-2 text-xs rounded-md border border-gray-700 text-red-400 hover:text-red-300 hover:bg-red-500/10 hover:border-red-500/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Disconnect sync"
+                              >
+                                {isDeletingSyncConfig ? 'Disconnecting...' : 'Disconnect'}
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  if (id && env && folder) {
+                                    try {
+                                      const configData = await apiService.getRenderSyncConfig(id, env, folder || 'default');
+                                      if (configData.config) {
+                                        setSelectedRenderIntegration(configData.config.renderIntegrationId || '');
+                                        setSelectedRenderService(configData.config.renderServiceId);
+                                        
+                                        if (configData.config.renderIntegrationId) {
+                                          await loadRenderServices(configData.config.renderIntegrationId);
+                                        }
+                                      }
+                                    } catch (error) {
+                                      console.error('Failed to load sync config:', error);
+                                    }
+                                  }
+                                  setShowRenderConfigModal(true);
+                                }}
+                                className="px-3 py-2 text-xs rounded-md border border-gray-700 text-gray-300 hover:bg-gray-800 transition-colors"
+                                title="Configure sync"
+                              >
+                                Configure
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  if (!id || !env) {
+                                    toast.error('Invalid project or environment');
+                                    return;
+                                  }
+                                  
+                                  if (!selectedRenderIntegration) {
+                                    toast.error('Please configure the sync first by clicking "Configure" to select a Render integration and service.');
+                                    setShowRenderConfigModal(true);
+                                    return;
+                                  }
+                                  
+                                  if (!selectedRenderService) {
+                                    toast.error('Please configure the sync first by clicking "Configure" to select a Render service.');
+                                    setShowRenderConfigModal(true);
+                                    return;
+                                  }
+                                  
+                                  try {
+                                    setIsSyncing(true);
+                                    
+                                    const selectedService = renderServices.find((s: any) => (s.id || s.service?.id) === selectedRenderService);
+                                    const serviceName = selectedService?.name || selectedService?.service?.name || selectedService?.serviceDetails?.name;
+                                    
+                                    if (!selectedService) {
+                                      toast.error('Selected Render service not found. Please reconfigure.');
+                                      setShowRenderConfigModal(true);
+                                      return;
+                                    }
+                                    
+                                    const data = await apiService.syncToRender({
+                                      projectId: id,
+                                      environment: env,
+                                      folder: folder || 'default',
+                                      renderIntegrationId: selectedRenderIntegration,
+                                      renderServiceId: selectedRenderService,
+                                      renderServiceName: serviceName,
+                                    });
+                                    
+                                    if (data.success) {
+                                      if (data.errors && data.errors.length > 0) {
+                                        toast.error(`Synced ${data.synced} secret(s) with ${data.errors.length} error(s): ${data.errors.join(', ')}`, {
+                                          duration: 5000,
+                                        });
+                                      } else {
+                                        toast.success(`Successfully synced ${data.synced} secret(s) to Render`);
+                                      }
+                                      await checkRenderConnection();
+                                      await fetchLogs();
+                                    } else {
+                                      toast.error(`Sync failed: ${data.message || 'Unknown error'}`);
+                                    }
+                                  } catch (e) {
+                                    console.error('Sync failed:', e);
+                                    toast.error('Failed to sync to Render. Please try again.');
+                                  } finally {
+                                    setIsSyncing(false);
+                                  }
+                                }}
+                                disabled={!selectedRenderIntegration || !selectedRenderService || renderServices.length === 0 || isSyncing}
+                                className="px-3 py-2 text-xs rounded-md bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              >
+                                {isSyncing ? (
+                                  <span className="flex items-center gap-1.5">
+                                    <svg className="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                    Syncing...
+                                  </span>
+                                ) : (
+                                  'Trigger Sync'
+                                )}
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={async () => {
+                                if (id && env && folder) {
+                                  try {
+                                    const configData = await apiService.getRenderSyncConfig(id, env, folder || 'default');
+                                    if (configData.config) {
+                                      setSelectedRenderIntegration(configData.config.renderIntegrationId || '');
+                                      setSelectedRenderService(configData.config.renderServiceId);
+                                      
+                                      if (configData.config.renderIntegrationId) {
+                                        await loadRenderServices(configData.config.renderIntegrationId);
+                                      }
+                                    }
+                                  } catch (error) {
+                                    console.error('Failed to load sync config:', error);
+                                  }
+                                }
+                                setShowRenderConfigModal(true);
+                              }}
+                              className="px-3 py-2 text-xs rounded-md border border-gray-700 text-gray-300 hover:bg-gray-800 transition-colors"
+                              title="Configure sync"
+                            >
+                              Configure
+                            </button>
+                          )}
+                        </div>
+                      </CardContent>
+                    )}
+                  </Card>
+                )}
+              </div>
             ) : (
               /* Empty State */
-              <div className="text-center py-12">
+              <Card className="border-dashed border-gray-700">
+                <CardContent className="text-center py-12">
                 <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1890,107 +2308,18 @@ const breadcrumbItems = useMemo(() => {
                 </div>
                 <h3 className="text-lg font-semibold text-white mb-2">No Connected Syncs</h3>
                 <p className="text-sm text-gray-400 mb-6 max-w-md mx-auto">
-                  Connect your secrets to external platforms like Vercel to automatically sync environment variables.
+                    Connect your secrets to external platforms to automatically sync environment variables.
                 </p>
                 <button
-                  onClick={() => setShowConnectModal(true)}
-                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
+                    onClick={() => setShowAddSyncModal(true)}
+                    className="px-4 py-2 text-sm rounded-md bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-500/50 transition-colors"
                 >
                   Add Your First Sync
                 </button>
-              </div>
-            )}
           </CardContent>
         </Card>
-
-        {/* Vercel Integrations Management Card */}
-        {vercelConnected && (
-          <Card className="hover-lift">
-            <CardHeader className="pb-3 flex flex-row items-center justify-between">
-              <CardTitle className="text-white text-sm font-semibold">Vercel Integrations</CardTitle>
-              <button
-                onClick={() => setShowConnectModal(true)}
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded-lg transition-colors flex items-center gap-1.5"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Add Integration
-              </button>
-            </CardHeader>
-            <CardContent>
-              {vercelIntegrations.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-sm text-gray-400 mb-4">No Vercel integrations found</p>
-                  <button
-                    onClick={() => setShowConnectModal(true)}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors text-sm"
-                  >
-                    Add Your First Integration
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {vercelIntegrations.map((integration) => (
-                    <div
-                      key={integration.id}
-                      className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg border border-gray-700 hover:border-gray-600 transition-colors"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="text-sm font-medium text-white">{integration.name}</h4>
-                          {integration.vercelTeamName && (
-                            <span className="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded">
-                              {integration.vercelTeamName}
-                            </span>
-                          )}
-                          {selectedVercelIntegration === integration.id && (
-                            <span className="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
-                              Active
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-gray-400">
-                          Connected {new Date(integration.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={async () => {
-                            try {
-                              setIsDeletingIntegration(integration.id);
-                              await apiService.deleteVercelIntegration(integration.id);
-                              // Refresh integrations and connection status
-                              await checkVercelConnection();
-                              // If deleted integration was selected, clear selection
-                              if (selectedVercelIntegration === integration.id) {
-                                setSelectedVercelIntegration('');
-                                setSelectedVercelProject('');
-                                setVercelProjects([]);
-                              }
-                              // Refresh logs to show the deletion event
-                              await fetchLogs();
-                              toast.success('Vercel integration deleted successfully');
-                            } catch (error) {
-                              console.error('Failed to delete integration:', error);
-                              toast.error('Failed to delete integration. Please try again.');
-                            } finally {
-                              setIsDeletingIntegration(null);
-                            }
-                          }}
-                          disabled={isDeletingIntegration === integration.id}
-                          className="px-3 py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isDeletingIntegration === integration.id ? 'Deleting...' : 'Delete'}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+            )}
+          </div>
         </div>
       )}
 
@@ -2074,54 +2403,352 @@ const breadcrumbItems = useMemo(() => {
         </div>
       )}
 
-      {/* Connect to Vercel Modal */}
-      {showConnectModal && (
+      {/* Add Sync Modal - Shows available sync providers */}
+      {(showAddSyncModal || isLoadingVercelSync) && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="w-full max-w-2xl bg-gray-900 rounded-xl border border-gray-700 shadow-2xl animate-slide-up">
+          <div className="w-full max-w-2xl bg-gray-900 rounded-xl border border-gray-700 shadow-2xl animate-slide-up relative">
+            {isLoadingVercelSync && (
+              <div className="absolute inset-0 bg-gray-900/95 backdrop-blur-sm rounded-xl flex items-center justify-center z-20">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="h-10 w-10 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+                  <span className="text-sm text-gray-300 font-medium">Loading Vercel sync...</span>
+                  <span className="text-xs text-gray-500">Please wait</span>
+                </div>
+              </div>
+            )}
             <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 rounded-xl flex items-center justify-center">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Add Sync</h3>
+                  <p className="text-xs text-gray-400 mt-1">Choose a platform to sync your secrets with</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (!isLoadingVercelSync) {
+                      setShowAddSyncModal(false);
+                    }
+                  }}
+                  disabled={isLoadingVercelSync}
+                  className="h-8 w-8 p-0"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Vercel Sync Option */}
+                <Card
+                  className={`border-gray-800 transition-all relative overflow-hidden group ${
+                    isLoadingVercelSync 
+                      ? 'cursor-wait opacity-75' 
+                      : 'hover:border-emerald-500/50 hover:shadow-emerald-500/10 cursor-pointer'
+                  }`}
+                  onClick={isLoadingVercelSync ? undefined : handleVercelSyncClick}
+                >
+                  {isLoadingVercelSync && (
+                    <div className="absolute inset-0 bg-gray-900/90 backdrop-blur-sm flex items-center justify-center z-10 rounded-xl">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+                        <span className="text-sm text-gray-300 font-medium">Loading...</span>
+                      </div>
+                    </div>
+                  )}
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="w-12 h-12 bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 rounded-xl flex items-center justify-center flex-shrink-0 border border-emerald-500/20">
+                          {isLoadingVercelSync ? (
+                            <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
+                          ) : (
                   <svg className="w-6 h-6 text-emerald-400" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 2L2 22h20L12 2z" />
                   </svg>
+                          )}
                 </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-white">Connect to Vercel</h3>
-                  <p className="text-sm text-gray-400">Link your Vercel account to sync secrets</p>
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-base mb-1">Vercel</CardTitle>
+                          <CardDescription className="text-xs">
+                            Sync secrets to Vercel environment variables
+                          </CardDescription>
                 </div>
+                      </div>
+                      {!isLoadingVercelSync && (
+                        <svg className="w-5 h-5 text-gray-400 group-hover:text-emerald-400 transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    {vercelConnected ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium rounded-full">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Connected
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-500">Not connected</span>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Render Sync Option */}
+                <Card
+                  className={`border-gray-800 transition-all relative overflow-hidden group ${
+                    isLoadingRenderSync 
+                      ? 'cursor-wait opacity-75' 
+                      : 'hover:border-emerald-500/50 hover:shadow-emerald-500/10 cursor-pointer'
+                  }`}
+                  onClick={isLoadingRenderSync ? undefined : async () => {
+                    if (!id) {
+                      toast.error('Invalid project');
+                      return;
+                    }
+                    
+                    try {
+                      setIsLoadingRenderSync(true);
+                      
+                      // Get project to find organizationId
+                      const projectRes = await apiService.getProject(id);
+                      const orgId = projectRes.project?.organizationId;
+                      
+                      if (!orgId) {
+                        toast.error('Could not determine workspace. Please try again.');
+                        setIsLoadingRenderSync(false);
+                        return;
+                      }
+                      
+                      // Check if Render is connected
+                      const statusRes = await apiService.checkRenderStatus(orgId);
+                      setRenderConnected(statusRes.connected);
+                      
+                      if (statusRes.connected) {
+                        // Load integrations and open config modal
+                        const integrationsRes = await apiService.getRenderIntegrations(orgId);
+                        setRenderIntegrations(integrationsRes.integrations);
+                        
+                        if (integrationsRes.integrations.length > 0) {
+                          setSelectedRenderIntegration(integrationsRes.integrations[0].id);
+                          await loadRenderServices(integrationsRes.integrations[0].id);
+                        }
+                        
+                        setShowAddSyncModal(false);
+                        setTimeout(() => {
+                          setShowRenderConfigModal(true);
+                        }, 300);
+                      } else {
+                        // Open connect modal
+                        setShowAddSyncModal(false);
+                        setTimeout(() => {
+                          setShowRenderConnectModal(true);
+                        }, 300);
+                      }
+                    } catch (error: any) {
+                      console.error('Failed to check Render status:', error);
+                      toast.error('Failed to check Render connection status');
+                    } finally {
+                      setIsLoadingRenderSync(false);
+                    }
+                  }}
+                >
+                  {isLoadingRenderSync && (
+                    <div className="absolute inset-0 bg-gray-900/90 backdrop-blur-sm flex items-center justify-center z-10 rounded-xl">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+                        <span className="text-sm text-gray-300 font-medium">Loading...</span>
+                      </div>
+                    </div>
+                  )}
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="w-12 h-12 bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 rounded-xl flex items-center justify-center flex-shrink-0 border border-emerald-500/20">
+                          {isLoadingRenderSync ? (
+                            <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
+                          ) : (
+                            <svg className="w-6 h-6 text-emerald-400" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M12 2L2 7v10l10 5 10-5V7L12 2zm0 2.18l8 4v8.36l-8-4V4.18z" />
+                            </svg>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-base mb-1">Render</CardTitle>
+                          <CardDescription className="text-xs">
+                            Sync secrets to Render service environment variables
+                          </CardDescription>
+                        </div>
+                      </div>
+                      {!isLoadingRenderSync && (
+                        <svg className="w-5 h-5 text-gray-400 group-hover:text-emerald-400 transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    {renderConnected ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium rounded-full">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Connected
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-500">Not connected</span>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* AWS Secrets Manager - Coming Soon */}
+                <Card className="border-gray-800 opacity-60 cursor-not-allowed">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="w-12 h-12 bg-gray-800/50 rounded-xl flex items-center justify-center flex-shrink-0 border border-gray-700/50">
+                          <svg className="w-6 h-6 text-gray-500" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <CardTitle className="text-base text-gray-400">AWS Secrets Manager</CardTitle>
+                            <span className="px-2 py-0.5 bg-gray-800/50 border border-gray-700/50 text-gray-500 text-xs font-medium rounded-full">Coming Soon</span>
+                          </div>
+                          <CardDescription className="text-xs text-gray-500">
+                            Sync secrets to AWS Secrets Manager
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                </Card>
+
+                {/* Google Cloud Secret Manager - Coming Soon */}
+                <Card className="border-gray-800 opacity-60 cursor-not-allowed">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="w-12 h-12 bg-gray-800/50 rounded-xl flex items-center justify-center flex-shrink-0 border border-gray-700/50">
+                          <svg className="w-6 h-6 text-gray-500" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <CardTitle className="text-base text-gray-400">Google Cloud</CardTitle>
+                            <span className="px-2 py-0.5 bg-gray-800/50 border border-gray-700/50 text-gray-500 text-xs font-medium rounded-full">Coming Soon</span>
+                          </div>
+                          <CardDescription className="text-xs text-gray-500">
+                            Sync secrets to Google Cloud Secret Manager
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                </Card>
+
+                {/* Azure Key Vault - Coming Soon */}
+                <Card className="border-gray-800 opacity-60 cursor-not-allowed">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="w-12 h-12 bg-gray-800/50 rounded-xl flex items-center justify-center flex-shrink-0 border border-gray-700/50">
+                          <svg className="w-6 h-6 text-gray-500" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <CardTitle className="text-base text-gray-400">Azure Key Vault</CardTitle>
+                            <span className="px-2 py-0.5 bg-gray-800/50 border border-gray-700/50 text-gray-500 text-xs font-medium rounded-full">Coming Soon</span>
+                          </div>
+                          <CardDescription className="text-xs text-gray-500">
+                            Sync secrets to Azure Key Vault for Microsoft cloud services
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                </Card>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Connect to Vercel Modal */}
+      {showConnectModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="w-full max-w-lg bg-gray-900 rounded-xl border border-gray-700 shadow-2xl animate-slide-up">
+            <div className="p-5">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2L2 22h20L12 2z" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-semibold text-white">Connect to Vercel</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Link your Vercel account to sync secrets</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowConnectModal(false);
+                    setVercelToken('');
+                    setVercelIntegrationName('');
+                  }}
+                  disabled={isConnecting}
+                  className="h-8 w-8 p-0"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </Button>
               </div>
 
               {/* Instructions */}
-              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 mb-4">
-                <h4 className="text-sm font-semibold text-emerald-400 mb-2">How to get your Vercel token:</h4>
-                <ol className="space-y-2 text-sm text-gray-300">
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 mb-4">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <h4 className="text-xs font-semibold text-emerald-400">How to get your token:</h4>
+                </div>
+                <ol className="space-y-1.5 text-xs text-gray-300">
                   <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">1.</span>
+                    <span className="text-emerald-400 font-bold flex-shrink-0">1.</span>
                     <span>
-                      Go to{' '}
+                      Visit{' '}
                       <a 
                         href="https://vercel.com/account/tokens" 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="text-emerald-400 hover:underline font-medium"
+                        className="text-emerald-400 hover:underline font-medium inline-flex items-center gap-1"
                       >
                         vercel.com/account/tokens
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
                       </a>
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">2.</span>
-                    <span>Click <strong>"Create Token"</strong></span>
+                    <span className="text-emerald-400 font-bold flex-shrink-0">2.</span>
+                    <span>Click <strong className="text-white">"Create Token"</strong> and give it a name</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">3.</span>
-                    <span>
-                      Give it a name (e.g., "APIVault Sync") and select scope:{' '}
-                      <strong className="text-white">Full Access</strong> or specific projects
-                    </span>
+                    <span className="text-emerald-400 font-bold flex-shrink-0">3.</span>
+                    <span>Select scope: <strong className="text-white">Full Access</strong> or specific projects</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">4.</span>
+                    <span className="text-emerald-400 font-bold flex-shrink-0">4.</span>
                     <span>Copy the token and paste it below</span>
                   </li>
                 </ol>
@@ -2129,64 +2756,67 @@ const breadcrumbItems = useMemo(() => {
 
               {/* Integration Name Input */}
               <div className="mb-4">
-                <label className="text-sm font-medium text-gray-300 mb-2 block">
+                <label htmlFor="vercel-integration-name" className="text-sm font-medium text-gray-300 mb-2 block">
                   Integration Name <span className="text-gray-500">(optional)</span>
                 </label>
-                <input
+                <Input
+                  id="vercel-integration-name"
                   type="text"
                   value={vercelIntegrationName}
                   onChange={(e) => setVercelIntegrationName(e.target.value)}
                   placeholder="e.g., Production Vercel, Team Account..."
-                  className="w-full px-4 py-3 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-emerald-500 focus:outline-none"
+                  helperText="Optional: Give this integration a name to identify it"
+                  className="text-xs"
                 />
-                <p className="text-xs text-gray-500 mt-2">
-                  Give this integration a name to identify it (useful when you have multiple Vercel accounts)
-                </p>
               </div>
 
               {/* Token Input */}
               <div className="mb-4">
-                <label className="text-sm font-medium text-gray-300 mb-2 block">
+                <label htmlFor="vercel-token" className="text-sm font-medium text-gray-300 mb-2 block">
                   Vercel Access Token <span className="text-red-400">*</span>
                 </label>
-                <input
+                <Input
+                  id="vercel-token"
                   type="password"
                   value={vercelToken}
                   onChange={(e) => setVercelToken(e.target.value)}
                   placeholder="Paste your Vercel token here..."
-                  className="w-full px-4 py-3 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-emerald-500 focus:outline-none font-mono text-sm"
+                  helperText="Your token will be encrypted and stored securely"
+                  className="font-mono text-xs"
                   autoFocus
                 />
-                <p className="text-xs text-gray-500 mt-2">
-                  🔒 Your token will be encrypted and stored securely
-                </p>
               </div>
 
               {/* Deployment Note */}
-              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-4">
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2.5 mb-4">
                 <div className="flex items-start gap-2">
-                  <svg className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <p className="text-xs text-gray-300">
-                    <strong className="text-yellow-400">Note:</strong> After syncing secrets, you'll need to manually redeploy from your Vercel dashboard for changes to take effect.
+                  <p className="text-xs text-gray-300 leading-relaxed">
+                    <strong className="text-yellow-400">Note:</strong> After syncing secrets, manually redeploy from your Vercel dashboard for changes to take effect.
                   </p>
                 </div>
               </div>
 
               {/* Actions */}
-              <div className="flex gap-3">
-                <button
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => {
                     setShowConnectModal(false);
                     setVercelToken('');
                     setVercelIntegrationName('');
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-700 text-gray-300 hover:bg-gray-800 rounded-lg transition-colors"
+                  className="flex-1 text-xs"
+                  disabled={isConnecting}
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
                   onClick={async () => {
                     if (!vercelToken.trim()) {
                       toast.error('Please enter your Vercel token');
@@ -2263,10 +2893,11 @@ const breadcrumbItems = useMemo(() => {
                     }
                   }}
                   disabled={!vercelToken.trim() || isConnecting}
-                  className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  loading={isConnecting}
+                  className="flex-1 text-xs"
                 >
-                  {isConnecting ? 'Connecting...' : 'Connect to Vercel'}
-                </button>
+                  Connect to Vercel
+                </Button>
               </div>
             </div>
           </div>
@@ -2276,75 +2907,159 @@ const breadcrumbItems = useMemo(() => {
       {/* Configure Vercel Sync Modal */}
       {showConfigModal && vercelConnected && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="w-full max-w-2xl bg-gray-900 rounded-xl border border-gray-700 shadow-2xl animate-slide-up">
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 rounded-xl flex items-center justify-center">
-                  <svg className="w-6 h-6 text-emerald-400" viewBox="0 0 24 24" fill="currentColor">
+          <div className="w-full max-w-lg bg-gray-900 rounded-xl border border-gray-700 shadow-2xl animate-slide-up">
+            <div className="p-5">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 2L2 22h20L12 2z" />
                   </svg>
                 </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-white">Configure Vercel Sync</h3>
-                  <p className="text-sm text-gray-400">Select which Vercel integration, project and environment to sync to</p>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-semibold text-white">Configure Vercel Sync</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {vercelIntegrations.length > 1 
+                      ? 'Select integration, project and environment' 
+                      : 'Select project and environment'}
+                  </p>
                 </div>
               </div>
 
-              {/* Vercel Integration Selection */}
-              <div className="mb-4">
-                <label className="text-sm font-medium text-gray-300 mb-2 block">
-                  Vercel Integration <span className="text-red-400">*</span>
-                </label>
-                <select
-                  value={selectedVercelIntegration}
-                  onChange={async (e) => {
-                    const integrationId = e.target.value;
-                    setSelectedVercelIntegration(integrationId);
-                    setSelectedVercelProject(''); // Reset project selection
-                    if (integrationId) {
-                      await loadVercelProjects(integrationId);
-                    } else {
-                      setVercelProjects([]);
-                    }
-                  }}
-                  className="w-full px-4 py-3 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-emerald-500 focus:outline-none"
-                >
-                  <option value="">Select a Vercel integration...</option>
-                  {vercelIntegrations.map((integration) => (
-                    <option key={integration.id} value={integration.id}>
-                      {integration.name} {integration.vercelTeamName ? `(${integration.vercelTeamName})` : ''}
-                    </option>
-                  ))}
-                </select>
+              {/* Vercel Integration Selection - Only show dropdown if multiple integrations exist */}
+              {vercelIntegrations.length > 1 && (
+                <div className="mb-4">
+                  <label className="text-sm font-medium text-gray-300 mb-2 block">
+                    Vercel Integration <span className="text-red-400">*</span>
+                  </label>
+                  <Select
+                    value={selectedVercelIntegration || vercelIntegrations[0]?.id}
+                    onValueChange={async (integrationId) => {
+                      setSelectedVercelIntegration(integrationId);
+                      setSelectedVercelProject(''); // Reset project selection
+                      if (integrationId) {
+                        await loadVercelProjects(integrationId);
+                      } else {
+                        setVercelProjects([]);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-9">
+                      {selectedVercelIntegration ? (
+                        <div className="flex flex-col items-start text-left w-full">
+                          <span className="text-gray-300 font-medium text-xs">
+                            {vercelIntegrations.find(i => i.id === selectedVercelIntegration)?.name || 'Selected'}
+                          </span>
+                          {vercelIntegrations.find(i => i.id === selectedVercelIntegration)?.vercelTeamName && (
+                            <span className="text-[11px] text-gray-500">
+                              {vercelIntegrations.find(i => i.id === selectedVercelIntegration)?.vercelTeamName}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <SelectValue placeholder="Select a Vercel integration..." />
+                      )}
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vercelIntegrations.map((integration) => (
+                        <SelectItem key={integration.id} value={integration.id}>
+                          <div className="flex flex-col gap-0.5 w-full">
+                            <span className="font-medium truncate">{integration.name}</span>
+                            {integration.vercelTeamName && (
+                              <span className="text-gray-500 text-[11px] truncate">{integration.vercelTeamName}</span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500 mt-1.5">
+                    Choose which Vercel integration to use for this sync. Each folder can sync to a different integration.
+                  </p>
+                </div>
+              )}
+              
+              {/* Show current integration if only one exists */}
+              {vercelIntegrations.length === 1 && (
+                <div className="mb-4">
+                  <label className="text-sm font-medium text-gray-300 mb-2 block">
+                    Vercel Integration
+                  </label>
+                  <div className="px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs font-medium text-gray-300">
+                        {vercelIntegrations[0].name}
+                      </span>
+                      {vercelIntegrations[0].vercelTeamName && (
+                        <span className="text-[11px] text-gray-500">
+                          {vercelIntegrations[0].vercelTeamName}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
                 {vercelIntegrations.length === 0 && (
-                  <p className="text-xs text-gray-500 mt-2">
+                <div className="mb-4">
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+                    <p className="text-xs text-yellow-400 flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
                     No Vercel integrations found. Please connect a Vercel account first.
                   </p>
-                )}
               </div>
+                </div>
+              )}
 
               {/* Vercel Project Selection */}
               <div className="mb-4">
                 <label className="text-sm font-medium text-gray-300 mb-2 block">
                   Vercel Project <span className="text-red-400">*</span>
                 </label>
-                <select
+                <Select
                   value={selectedVercelProject}
-                  onChange={(e) => setSelectedVercelProject(e.target.value)}
+                  onValueChange={(projectId) => setSelectedVercelProject(projectId)}
                   disabled={!selectedVercelIntegration}
-                  className="w-full px-4 py-3 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-emerald-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <option value="">
-                    {selectedVercelIntegration ? 'Select a Vercel project...' : 'Select an integration first...'}
-                  </option>
-                  {vercelProjects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="h-9">
+                    {selectedVercelProject ? (
+                      <span className="text-gray-300 font-medium text-xs">
+                        {vercelProjects.find(p => p.id === selectedVercelProject)?.name || 'Selected'}
+                      </span>
+                    ) : (
+                      <SelectValue 
+                        placeholder={
+                          selectedVercelIntegration 
+                            ? 'Select a Vercel project...' 
+                            : 'Select an integration first...'
+                        } 
+                      />
+                    )}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {!selectedVercelIntegration ? (
+                      <div className="px-3 py-2 text-xs text-gray-500">
+                        Please select an integration first
+                      </div>
+                    ) : vercelProjects.length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-gray-500">
+                        No projects found
+                      </div>
+                    ) : (
+                      vercelProjects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          <span className="font-medium">{project.name}</span>
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
                 {selectedVercelIntegration && vercelProjects.length === 0 && (
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
                     No Vercel projects found. Make sure you have projects in your Vercel account.
                   </p>
                 )}
@@ -2355,49 +3070,73 @@ const breadcrumbItems = useMemo(() => {
                 <label className="text-sm font-medium text-gray-300 mb-2 block">
                   Vercel Environment <span className="text-red-400">*</span>
                 </label>
-                <select
+                <Select
                   value={vercelEnvTarget}
-                  onChange={(e) => setVercelEnvTarget(e.target.value as 'production' | 'preview' | 'development')}
-                  className="w-full px-4 py-3 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-emerald-500 focus:outline-none"
+                  onValueChange={(value) => setVercelEnvTarget(value as 'production' | 'preview' | 'development')}
                 >
-                  <option value="production">Production</option>
-                  <option value="preview">Preview</option>
-                  <option value="development">Development</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-2">
+                  <SelectTrigger className="h-9">
+                    {vercelEnvTarget ? (
+                      <span className="text-gray-300 font-medium text-xs capitalize">
+                        {vercelEnvTarget}
+                      </span>
+                    ) : (
+                      <SelectValue placeholder="Select environment..." />
+                    )}
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="production">
+                      <span className="font-medium">Production</span>
+                    </SelectItem>
+                    <SelectItem value="preview">
+                      <span className="font-medium">Preview</span>
+                    </SelectItem>
+                    <SelectItem value="development">
+                      <span className="font-medium">Development</span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
                   Secrets will be synced to this environment in the selected Vercel project.
                 </p>
               </div>
 
               {/* Info Box */}
-              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 mb-4">
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-2.5 mb-4">
                 <div className="flex items-start gap-2">
-                  <svg className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <p className="text-xs text-gray-300">
-                    <strong className="text-emerald-400">Sync Mapping:</strong> This folder ({folder || 'default'}) in {environmentLabel} environment will sync to{' '}
+                  <p className="text-xs text-gray-300 leading-relaxed">
+                    <strong className="text-emerald-400">Sync Mapping:</strong> {folder || 'default'} ({environmentLabel}) →{' '}
                     <strong className="text-white">
-                      {selectedVercelIntegration ? vercelIntegrations.find(i => i.id === selectedVercelIntegration)?.name || 'selected integration' : 'selected integration'}
+                      {selectedVercelIntegration ? vercelIntegrations.find(i => i.id === selectedVercelIntegration)?.name || 'integration' : 'integration'}
                     </strong>
                     {' → '}
-                    <strong className="text-white">{selectedVercelProject ? vercelProjects.find(p => p.id === selectedVercelProject)?.name || 'selected project' : 'selected project'}</strong>{' '}
-                    in <strong className="text-white">{vercelEnvTarget}</strong> environment.
+                    <strong className="text-white">{selectedVercelProject ? vercelProjects.find(p => p.id === selectedVercelProject)?.name || 'project' : 'project'}</strong>{' '}
+                    (<strong className="text-white">{vercelEnvTarget}</strong>)
                   </p>
                 </div>
               </div>
 
               {/* Actions */}
-              <div className="flex gap-3">
-                <button
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => {
                     setShowConfigModal(false);
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-700 text-gray-300 hover:bg-gray-800 rounded-lg transition-colors"
+                  className="flex-1 text-xs"
+                  disabled={isSavingConfig}
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
                   onClick={async () => {
                     if (!selectedVercelIntegration) {
                       toast.error('Please select a Vercel integration');
@@ -2446,10 +3185,11 @@ const breadcrumbItems = useMemo(() => {
                     }
                   }}
                   disabled={!selectedVercelIntegration || !selectedVercelProject || isSavingConfig}
-                  className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  loading={isSavingConfig}
+                  className="flex-1 text-xs"
                 >
-                  {isSavingConfig ? 'Saving...' : 'Save Configuration'}
-                </button>
+                  Save Configuration
+                </Button>
               </div>
             </div>
           </div>
@@ -2505,6 +3245,382 @@ const breadcrumbItems = useMemo(() => {
           description="This will permanently delete the secret. This action cannot be undone."
           isLoading={isDeletingSecret}
         />
+      )}
+
+      {/* Connect to Render Modal */}
+      {showRenderConnectModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="w-full max-w-lg bg-gray-900 rounded-xl border border-gray-700 shadow-2xl animate-slide-up">
+            <div className="p-5">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2L2 7v10l10 5 10-5V7L12 2zm0 2.18l8 4v8.36l-8-4V4.18z" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-semibold text-white">Connect to Render</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Link your Render account to sync secrets</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowRenderConnectModal(false);
+                    setRenderApiKey('');
+                    setRenderIntegrationName('');
+                  }}
+                  disabled={isConnectingRender}
+                  className="h-8 w-8 p-0"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </Button>
+              </div>
+
+              {/* Instructions */}
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 mb-4">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <h4 className="text-xs font-semibold text-emerald-400">How to get your Render API key:</h4>
+                </div>
+                <ol className="space-y-1.5 text-xs text-gray-300">
+                  <li className="flex items-start gap-2">
+                    <span className="text-emerald-400 font-bold flex-shrink-0">1.</span>
+                    <span>
+                      Go to{' '}
+                      <a 
+                        href="https://dashboard.render.com/account/api-keys" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-emerald-400 hover:underline font-medium inline-flex items-center gap-1"
+                      >
+                        Render Dashboard → Account Settings → API Keys
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                      {' '}(or click the button below)
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-emerald-400 font-bold flex-shrink-0">2.</span>
+                    <span>Click the <strong className="text-white">"Create API Key"</strong> button on the page</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-emerald-400 font-bold flex-shrink-0">3.</span>
+                    <span>Enter a descriptive name (e.g., "Key Vault Integration") and click <strong className="text-white">"Create"</strong></span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-emerald-400 font-bold flex-shrink-0">4.</span>
+                    <span><strong className="text-white">⚠️ Copy the API key immediately</strong> - Render only shows it once. You won't be able to view it again.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-emerald-400 font-bold flex-shrink-0">5.</span>
+                    <span>Paste the copied API key in the field below</span>
+                  </li>
+                </ol>
+                <div className="mt-3 pt-3 border-t border-emerald-500/20">
+                  <a 
+                    href="https://dashboard.render.com/account/api-keys" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-xs text-emerald-400 hover:text-emerald-300 font-medium transition-colors w-full justify-center py-2 px-3 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg border border-emerald-500/20"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    Open Render API Keys Page
+                  </a>
+                </div>
+              </div>
+
+              {/* Integration Name Input */}
+              <div className="mb-4">
+                <label htmlFor="render-integration-name" className="text-sm font-medium text-gray-300 mb-2 block">
+                  Integration Name <span className="text-gray-500">(optional)</span>
+                </label>
+                <Input
+                  id="render-integration-name"
+                  type="text"
+                  value={renderIntegrationName}
+                  onChange={(e) => setRenderIntegrationName(e.target.value)}
+                  placeholder="e.g., Production Render, Team Account..."
+                  helperText="Optional: Give this integration a name to identify it"
+                  className="text-xs"
+                />
+              </div>
+
+              {/* API Key Input */}
+              <div className="mb-4">
+                <label htmlFor="render-api-key" className="text-sm font-medium text-gray-300 mb-2 block">
+                  Render API Key <span className="text-red-400">*</span>
+                </label>
+                <Input
+                  id="render-api-key"
+                  type="password"
+                  value={renderApiKey}
+                  onChange={(e) => setRenderApiKey(e.target.value)}
+                  placeholder="Paste your Render API key here..."
+                  helperText="Your API key will be encrypted and stored securely"
+                  className="font-mono text-xs"
+                  autoFocus
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowRenderConnectModal(false);
+                    setRenderApiKey('');
+                    setRenderIntegrationName('');
+                  }}
+                  className="flex-1 text-xs"
+                  disabled={isConnectingRender}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={async () => {
+                    if (!renderApiKey.trim()) {
+                      toast.error('Please enter your Render API key');
+                      return;
+                    }
+                    
+                    if (!id) {
+                      toast.error('Invalid project');
+                      return;
+                    }
+                    
+                    try {
+                      setIsConnectingRender(true);
+                      
+                      const projectRes = await apiService.getProject(id);
+                      const orgId = projectRes.project?.organizationId;
+                      
+                      if (!orgId) {
+                        toast.error('Could not determine workspace. Please try again.');
+                        setIsConnectingRender(false);
+                        return;
+                      }
+                      
+                      const data = await apiService.connectRender({
+                        apiKey: renderApiKey,
+                        organizationId: orgId,
+                        name: renderIntegrationName.trim() || undefined,
+                      });
+                      
+                      if (data.success) {
+                        setRenderConnected(true);
+                        setShowRenderConnectModal(false);
+                        setRenderApiKey('');
+                        setRenderIntegrationName('');
+                        
+                        await checkRenderConnection();
+                        
+                        if (data.integration) {
+                          setSelectedRenderIntegration(data.integration.id);
+                          await loadRenderServices(data.integration.id);
+                          
+                          if (id && env && folder) {
+                            try {
+                              const configData = await apiService.getRenderSyncConfig(id, env, folder || 'default');
+                              if (!configData.config) {
+                                setTimeout(() => {
+                                  setShowRenderConfigModal(true);
+                                }, 500);
+                              }
+                            } catch (configError) {
+                              console.error('Failed to load sync config:', configError);
+                              setTimeout(() => {
+                                setShowRenderConfigModal(true);
+                              }, 500);
+                            }
+                          }
+                        }
+                        
+                        toast.success('Render connected successfully');
+                      } else {
+                        toast.error(`Failed to connect: ${data.message || 'Unknown error'}`);
+                      }
+                    } catch (e) {
+                      console.error('Failed to connect Render:', e);
+                      toast.error('Failed to connect to Render. Please check your API key and try again.');
+                    } finally {
+                      setIsConnectingRender(false);
+                    }
+                  }}
+                  disabled={!renderApiKey.trim() || isConnectingRender}
+                  loading={isConnectingRender}
+                  className="flex-1 text-xs"
+                >
+                  Connect to Render
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Configure Render Sync Modal */}
+      {showRenderConfigModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="w-full max-w-md bg-gray-900 rounded-xl border border-gray-700 shadow-2xl animate-slide-up">
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-semibold text-white">Configure Render Sync</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowRenderConfigModal(false)}
+                  disabled={isSavingRenderConfig}
+                  className="h-8 w-8 p-0"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </Button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Render Integration Select */}
+                <div>
+                  <label className="text-sm font-medium text-gray-300 mb-2 block">
+                    Render Integration <span className="text-red-400">*</span>
+                  </label>
+                  <Select
+                    value={selectedRenderIntegration}
+                    onValueChange={async (value) => {
+                      setSelectedRenderIntegration(value);
+                      await loadRenderServices(value);
+                      setSelectedRenderService('');
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select integration" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {renderIntegrations.map((integration) => (
+                        <SelectItem key={integration.id} value={integration.id}>
+                          {integration.name || `Render ${new Date(integration.createdAt).toLocaleDateString()}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Render Service Select */}
+                <div>
+                  <label className="text-sm font-medium text-gray-300 mb-2 block">
+                    Render Service <span className="text-red-400">*</span>
+                  </label>
+                  <Select
+                    value={selectedRenderService}
+                    onValueChange={setSelectedRenderService}
+                    disabled={!selectedRenderIntegration || renderServices.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={!selectedRenderIntegration ? "Select integration first" : renderServices.length === 0 ? "Loading services..." : "Select service"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {isSavingRenderConfig ? (
+                        <div className="px-3 py-2 text-xs text-gray-400 text-center">Loading...</div>
+                      ) : (
+                        renderServices.map((service: any) => (
+                          <SelectItem key={service.id || service.service?.id} value={service.id || service.service?.id}>
+                            <span className="font-medium">{service.name || service.service?.name || service.serviceDetails?.name || 'Unknown Service'}</span>
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Info Box */}
+                <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3">
+                  <p className="text-xs text-gray-400">
+                    Secrets will be synced to this Render service as environment variables.
+                  </p>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 mt-5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowRenderConfigModal(false)}
+                  disabled={isSavingRenderConfig}
+                  className="flex-1 text-xs"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={async () => {
+                    if (!selectedRenderIntegration) {
+                      toast.error('Please select a Render integration');
+                      return;
+                    }
+                    
+                    if (!selectedRenderService) {
+                      toast.error('Please select a Render service');
+                      return;
+                    }
+                    
+                    if (!id || !env) {
+                      toast.error('Invalid project or environment');
+                      return;
+                    }
+                    
+                    try {
+                      setIsSavingRenderConfig(true);
+                      
+                      const selectedService = renderServices.find((s: any) => (s.id || s.service?.id) === selectedRenderService);
+                      const serviceName = selectedService?.name || selectedService?.service?.name || selectedService?.serviceDetails?.name;
+                      
+                      const data = await apiService.saveRenderSyncConfig({
+                        projectId: id,
+                        environment: env,
+                        folder: folder || 'default',
+                        renderIntegrationId: selectedRenderIntegration,
+                        renderServiceId: selectedRenderService,
+                        renderServiceName: serviceName,
+                      });
+                      
+                      if (data.success) {
+                        setShowRenderConfigModal(false);
+                        await checkRenderConnection();
+                        toast.success('Sync configuration saved successfully');
+                      } else {
+                        toast.error('Failed to save configuration');
+                      }
+                    } catch (e) {
+                      console.error('Failed to save sync config:', e);
+                      toast.error('Failed to save configuration. Please try again.');
+                    } finally {
+                      setIsSavingRenderConfig(false);
+                    }
+                  }}
+                  disabled={!selectedRenderIntegration || !selectedRenderService || isSavingRenderConfig}
+                  loading={isSavingRenderConfig}
+                  className="flex-1 text-xs"
+                >
+                  Save Configuration
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

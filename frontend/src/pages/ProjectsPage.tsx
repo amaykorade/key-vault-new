@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent } from '../components/ui/Card';
 import { useOrganizationsStore } from '../stores/organizations';
-import { apiService } from '../services/api';
+import { apiService, ApiError } from '../services/api';
+import toast from 'react-hot-toast';
 import type { Project } from '../types';
 
 export function ProjectsPage() {
@@ -49,6 +50,16 @@ export function ProjectsPage() {
       setProjectDescription('');
     } catch (err) {
       console.error('Failed to create project:', err);
+      if (err instanceof ApiError && err.status === 403 && err.message.startsWith('Free plan limit')) {
+        toast.error(
+          'Free plan limit reached: You can only create 1 project per workspace on the Free plan. Upgrade in Billing to create more.',
+          { duration: 10000 }
+        );
+      } else if (err instanceof ApiError) {
+        toast.error(err.message || 'Failed to create project', { duration: 5000 });
+      } else {
+        toast.error('Failed to create project', { duration: 5000 });
+      }
     } finally {
       setIsCreating(false);
     }

@@ -78,8 +78,8 @@ export function BillingPage() {
         items: [
           'Perfect for solo developers',
           '1 organization',
-          '3 projects',
-          '50 secrets',
+          '1 project',
+          '5 secrets',
           'Development environment',
           'CLI access included',
           'API access (1,000 requests/month)',
@@ -223,16 +223,13 @@ export function BillingPage() {
                     plan.ctaAction();
                   }
                 }}
-                disabled={plan.id === 'starter'}
                 className={`w-full rounded-lg px-6 py-3.5 text-sm font-semibold tracking-wide transition-all duration-200 ${
-                  plan.id === 'starter'
-                    ? 'bg-gray-700/50 text-gray-400 cursor-not-allowed opacity-60'
-                    : plan.popular
+                  plan.popular
                     ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-400 hover:to-emerald-500 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30'
                     : 'border-2 border-gray-700 bg-gray-900 text-gray-200 hover:border-emerald-500/40 hover:text-white hover:bg-gray-800'
                 }`}
               >
-                {plan.id === 'starter' ? 'Coming Soon' : plan.ctaLabel}
+                {plan.ctaLabel}
               </button>
             </CardFooter>
           </Card>
@@ -283,8 +280,8 @@ export function BillingPage() {
           <div className="divide-y divide-gray-800/80">
             {[
               ['Organizations', '1', 'Unlimited'],
-              ['Projects', '3', 'Unlimited'],
-              ['Secrets', '50', 'Unlimited'],
+              ['Projects', '1', 'Unlimited'],
+              ['Secrets', '5', 'Unlimited'],
               ['Environments', 'Development', 'Dev, Staging, Production'],
               ['CLI access', 'Included', 'Unlimited'],
               ['API requests', '1,000 / month', '100,000 / month'],

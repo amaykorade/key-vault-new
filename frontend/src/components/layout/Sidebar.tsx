@@ -5,8 +5,10 @@ import { ROUTES } from '../../constants';
 import { useAuthStore } from '../../stores/auth';
 import { useOrganizationsStore } from '../../stores/organizations';
 import { SidebarLink } from '../ui/SidebarLink';
-import { apiService } from '../../services/api';
+import { Logo } from '../Logo';
+import { apiService, ApiError } from '../../services/api';
 import type { Project } from '../../types';
+import toast from 'react-hot-toast';
 
 // legacy helper removed; kept for compatibility in older code references
 
@@ -24,10 +26,45 @@ export function Sidebar() {
   const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
   const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
+  const [planLabel, setPlanLabel] = useState<string | null>(null);
+  const [isFreePlan, setIsFreePlan] = useState(true);
 
   useEffect(() => {
     fetchOrganizations();
   }, [fetchOrganizations]);
+
+  // Load current subscription/plan for subtle limits + CTA
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadSubscription() {
+      try {
+        const res = await apiService.getSubscription();
+        const plan = res.subscription?.plan as string | undefined;
+
+        if (!isMounted) return;
+
+        if (!plan || plan === 'FREE') {
+          setIsFreePlan(true);
+          setPlanLabel('Free plan · 1 org · 1 project · 5 dev secrets');
+        } else {
+          setIsFreePlan(false);
+          const pretty = plan.charAt(0) + plan.slice(1).toLowerCase();
+          setPlanLabel(`${pretty} plan · higher limits unlocked`);
+        }
+      } catch (err) {
+        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+          return;
+        }
+      }
+    }
+
+    loadSubscription();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Restore last selected workspace from localStorage
   useEffect(() => {
@@ -91,6 +128,25 @@ export function Sidebar() {
       setNewWorkspaceName('');
     } catch (err) {
       console.error('Failed to create workspace:', err);
+      if (err instanceof ApiError) {
+        // Free plan org limit reached – show friendly upgrade message
+        if (err.status === 403 && err.message.startsWith('Free plan limit')) {
+          toast.error(
+            'Free plan limit reached: You can only create 1 workspace on the Free plan. Upgrade in Billing to create more.',
+            { duration: 10000 }
+          );
+        } else if (err.status === 500 && err.message === 'Internal server error') {
+          // Backend may still be returning a generic 500 – show a user-friendly limit message instead
+          toast.error(
+            'We could not create this workspace. On the Free plan you can only create 1 workspace. Upgrade in Billing to create more.',
+            { duration: 10000 }
+          );
+        } else {
+          toast.error(err.message || 'Failed to create workspace', { duration: 5000 });
+        }
+      } else {
+        toast.error('Failed to create workspace', { duration: 5000 });
+      }
     } finally {
       setIsCreatingWorkspace(false);
     }
@@ -131,16 +187,8 @@ export function Sidebar() {
     <aside className={`hidden lg:block w-64 flex-none bg-gray-900/50 backdrop-blur-sm h-screen sticky top-0 border-r border-gray-800 flex flex-col overflow-y-auto`}>
       {/* Brand/Logo Section */}
       <div className="p-4 border-b border-gray-800">
-        <Link to={ROUTES.LANDING} className="flex items-center space-x-3 transition hover:opacity-90">
-          <div className="w-8 h-8 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-lg flex items-center justify-center">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-white">APIVault</h1>
-            <p className="text-xs text-gray-400">Secure Secrets</p>
-          </div>
+        <Link to={ROUTES.LANDING} className="transition hover:opacity-90">
+          <Logo size="md" />
         </Link>
       </div>
 
@@ -282,7 +330,35 @@ export function Sidebar() {
           />
         </nav>
 
-        {/* User Account Section - This will be pushed to the bottom */}
+        {/* Plan summary + CTA */}
+        {planLabel && (
+          <div className="px-4 pb-2">
+            <button
+              onClick={() => navigate(ROUTES.BILLING)}
+              className="w-full rounded-lg border border-emerald-500/20 bg-gray-900/70 px-3 py-2 text-left text-xs text-emerald-100 hover:border-emerald-400/40 hover:bg-emerald-500/5 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    isFreePlan ? 'bg-emerald-400' : 'bg-sky-400'
+                  }`}
+                  aria-hidden
+                />
+                <span className="font-medium">
+                  {isFreePlan ? 'Free plan' : 'Current plan'}
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] text-emerald-100/80 line-clamp-2">
+                {planLabel}
+              </p>
+              <span className="mt-1 inline-flex text-[11px] font-semibold text-emerald-300">
+                Upgrade in Billing →
+              </span>
+            </button>
+          </div>
+        )}
+
+        {/* User Account Section - This will be pushed to the very bottom */}
         <div className="mt-auto p-4 border-t border-gray-800 relative" ref={userMenuRef}>
         <button
           onClick={() => setShowUserMenu(!showUserMenu)}

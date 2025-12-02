@@ -37,8 +37,8 @@ export function PricingPage() {
       items: [
         'Perfect for solo developers',
         '1 organization',
-        '3 projects',
-        '50 secrets',
+        '1 project',
+        '5 secrets',
         'Development environment',
         'CLI access included',
         'API access (1,000 requests/month)',
