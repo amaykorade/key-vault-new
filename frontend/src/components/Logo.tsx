@@ -28,42 +28,24 @@ export function Logo({ className = '', showText = true, size = 'md', variant = '
 
   if (variant === 'icon-only') {
     return (
-      <div className={`${sizeClasses[size]} bg-gradient-to-r from-emerald-600 to-teal-600 rounded-lg flex items-center justify-center ${className}`}>
-        <svg 
-          className={iconSizes[size]} 
-          fill="none" 
-          stroke="#ffffff" 
-          strokeWidth="2.5"
-          viewBox="0 0 24 24" 
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path 
-            strokeLinecap="round" 
-            strokeLinejoin="round" 
-            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" 
-          />
-        </svg>
+      <div className={`${sizeClasses[size]} rounded-lg flex items-center justify-center overflow-hidden ${className}`}>
+        <img
+          src="/Vector.svg"
+          alt="APIVault logo"
+          className="w-full h-full object-contain"
+        />
       </div>
     );
   }
 
   return (
     <div className={`flex items-center space-x-3 ${className}`}>
-      <div className={`${sizeClasses[size]} bg-gradient-to-r from-emerald-600 to-teal-600 rounded-lg flex items-center justify-center flex-shrink-0`}>
-        <svg 
-          className={iconSizes[size]} 
-          fill="none" 
-          stroke="#ffffff" 
-          strokeWidth="2.5"
-          viewBox="0 0 24 24" 
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path 
-            strokeLinecap="round" 
-            strokeLinejoin="round" 
-            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" 
-          />
-        </svg>
+      <div className={`${sizeClasses[size]} rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden`}>
+        <img
+          src="/Vector.svg"
+          alt="APIVault logo"
+          className="w-full h-full object-contain"
+        />
       </div>
       {showText && (
         <div className="flex flex-col">
