@@ -69,7 +69,7 @@ router.post('/projects/:projectId/api-keys', requireAuth, async (req: AuthReques
       return res.status(400).json({ error: 'Validation failed' });
     }
     console.error('Create API key error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 

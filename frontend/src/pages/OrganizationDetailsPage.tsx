@@ -510,7 +510,7 @@ export function OrganizationDetailsPage() {
                 return (
                   <div 
                     key={project.id} 
-                    className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700 rounded-xl p-5 hover:border-gray-600 transition-all duration-200 group cursor-pointer"
+                    className="relative bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700 rounded-xl p-5 hover:border-gray-600 transition-all duration-200 group cursor-pointer"
                     onClick={() => navigate(`/projects/${project.id}`)}
                   >
                     {/* Header */}

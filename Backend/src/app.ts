@@ -5,6 +5,7 @@ import session from 'express-session';
 import passport from './lib/passport';
 import authRoutes from './routes/auth';
 import googleAuthRoutes from './routes/google-auth';
+import githubAuthRoutes from './routes/github-auth';
 import organizationRoutes from './routes/organizations';
 import projectRoutes from './routes/projects';
 import secretRoutes from './routes/secrets';
@@ -129,6 +130,7 @@ app.get('/health', async (_req, res) => {
 // Auth routes
 app.use('/api/auth', authRoutes);
 app.use('/api/auth', googleAuthRoutes);
+app.use('/api/auth', githubAuthRoutes);
 
 // Organization routes
 app.use('/api/organizations', organizationRoutes);

@@ -76,7 +76,7 @@ export function FAQPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
-              href="mailto:support@apivault.com"
+              href="mailto:contact@apivault.it.com"
               className="inline-flex items-center justify-center rounded-lg px-6 py-3 text-sm font-semibold bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-400 hover:to-emerald-500 transition-all"
             >
               Contact Support →

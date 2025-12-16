@@ -77,7 +77,7 @@ router.post('/tokens', requireAuth, async (req: AuthRequest, res) => {
   } catch (error: any) {
     if (error?.name === 'ZodError') return res.status(400).json({ error: 'Validation failed' });
     console.error('Create PAT error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 

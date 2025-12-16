@@ -69,7 +69,7 @@ export async function requireApiToken(req: ApiRequest, res: Response, next: Next
     next();
   } catch (err) {
     console.error('API key auth error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 }
 
@@ -89,7 +89,7 @@ export async function requireUserApiToken(req: ApiRequest, res: Response, next: 
     next();
   } catch (err) {
     console.error('User API token auth error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 }
 

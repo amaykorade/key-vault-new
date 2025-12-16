@@ -58,7 +58,7 @@ router.post('/organizations/:organizationId/invitations', requireAuth, async (re
         return res.status(400).json({ error: error.message });
       }
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -134,7 +134,7 @@ router.post('/teams/:teamId/invitations', requireAuth, async (req: AuthRequest, 
         return res.status(status).json({ error: error.message });
       }
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -160,7 +160,7 @@ router.get('/invitations/:token', async (req, res) => {
     if (error instanceof Error && error.message === 'Invalid or expired invitation') {
       return res.status(404).json({ error: error.message });
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -212,7 +212,7 @@ router.post('/invitations/:token/accept', async (req, res) => {
         return res.status(400).json({ error: error.message });
       }
     }
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -239,7 +239,7 @@ router.get('/organizations/:organizationId/invitations', requireAuth, async (req
     if (error instanceof Error && error.message === 'Access denied') {
       return res.status(403).json({ error: error.message });
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -270,7 +270,7 @@ router.get('/teams/:teamId/invitations', requireAuth, async (req: AuthRequest, r
         return res.status(status).json({ error: error.message });
       }
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -293,7 +293,7 @@ router.delete('/invitations/:invitationId', requireAuth, async (req: AuthRequest
         return res.status(status).json({ error: error.message });
       }
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -328,7 +328,7 @@ router.post('/invitations/:invitationId/resend', requireAuth, async (req: AuthRe
         return res.status(status).json({ error: error.message });
       }
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 

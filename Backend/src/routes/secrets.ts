@@ -81,7 +81,7 @@ router.post('/projects/:projectId/secrets', requireAuth, async (req: AuthRequest
         return res.status(403).json({ error: error.message });
       }
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -113,7 +113,7 @@ router.get('/projects/:projectId/secrets', requireAuth, async (req: AuthRequest,
     if (error instanceof Error && error.message === 'Access denied') {
       return res.status(403).json({ error: 'Access denied' });
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -168,7 +168,7 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res) => {
     });
   } catch (error) {
     console.error('Get secret error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -234,7 +234,7 @@ router.put('/:id', requireAuth, async (req: AuthRequest, res) => {
         return res.status(403).json({ error: error.message });
       }
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -275,7 +275,7 @@ router.delete('/:id', requireAuth, async (req: AuthRequest, res) => {
     if (error instanceof Error && error.message === 'Access denied') {
       return res.status(403).json({ error: 'Access denied' });
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -303,7 +303,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res) => {
     });
   } catch (error) {
     console.error('Get user secrets error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -339,7 +339,7 @@ router.get('/search', requireAuth, async (req: AuthRequest, res) => {
     });
   } catch (error) {
     console.error('Search secrets error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -369,7 +369,7 @@ router.get('/projects/:projectId/secrets/type/:type', requireAuth, async (req: A
     if (error instanceof Error && error.message === 'Access denied') {
       return res.status(403).json({ error: 'Access denied' });
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -510,7 +510,7 @@ router.post('/projects/:projectId/secrets/import', requireAuth, async (req: Auth
         return res.status(403).json({ error: error.message });
       }
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 

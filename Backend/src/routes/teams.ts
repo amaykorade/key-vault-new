@@ -43,7 +43,7 @@ router.post('/organizations/:organizationId/teams', requireAuth, async (req: Aut
         return res.status(400).json({ error: error.message });
       }
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -71,7 +71,7 @@ router.get('/organizations/:organizationId/teams', requireAuth, async (req: Auth
     if (error instanceof Error && error.message === 'Access denied') {
       return res.status(403).json({ error: 'Access denied' });
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -112,7 +112,7 @@ router.get('/teams/:teamId', requireAuth, async (req: AuthRequest, res) => {
         return res.status(status).json({ error: error.message });
       }
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -157,7 +157,7 @@ router.put('/teams/:teamId', requireAuth, async (req: AuthRequest, res) => {
         return res.status(status).json({ error: error.message });
       }
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -180,7 +180,7 @@ router.delete('/teams/:teamId', requireAuth, async (req: AuthRequest, res) => {
         return res.status(status).json({ error: error.message });
       }
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -223,7 +223,7 @@ router.post('/teams/:teamId/members', requireAuth, async (req: AuthRequest, res)
         return res.status(status).json({ error: error.message });
       }
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -248,7 +248,7 @@ router.delete('/teams/:teamId/members/:userId', requireAuth, async (req: AuthReq
         return res.status(status).json({ error: error.message });
       }
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -291,7 +291,7 @@ router.put('/teams/:teamId/members/:userId/role', requireAuth, async (req: AuthR
         return res.status(status).json({ error: error.message });
       }
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -318,7 +318,7 @@ router.get('/users/me/teams', requireAuth, async (req: AuthRequest, res) => {
     });
   } catch (error) {
     console.error('Get user teams error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -366,7 +366,7 @@ router.post('/teams/:teamId/projects', requireAuth, async (req: AuthRequest, res
         return res.status(status).json({ error: error.message });
       }
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -390,7 +390,7 @@ router.delete('/teams/:teamId/projects/:projectId', requireAuth, async (req: Aut
         return res.status(status).json({ error: error.message });
       }
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -437,7 +437,7 @@ router.put('/teams/:teamId/projects/:projectId/permissions', requireAuth, async 
         return res.status(status).json({ error: error.message });
       }
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -464,7 +464,7 @@ router.get('/teams/:teamId/projects', requireAuth, async (req: AuthRequest, res)
         return res.status(status).json({ error: error.message });
       }
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -491,7 +491,7 @@ router.get('/projects/:projectId/teams', requireAuth, async (req: AuthRequest, r
         return res.status(status).json({ error: error.message });
       }
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 

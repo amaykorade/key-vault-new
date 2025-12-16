@@ -48,7 +48,7 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
       });
     }
 
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -71,7 +71,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res) => {
     });
   } catch (error) {
     console.error('Get organizations error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -98,7 +98,7 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res) => {
     });
   } catch (error) {
     console.error('Get organization error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -132,7 +132,7 @@ router.put('/:id', requireAuth, async (req: AuthRequest, res) => {
     if (error instanceof Error && error.message === 'Insufficient permissions') {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -157,7 +157,7 @@ router.get('/:id/members', requireAuth, async (req: AuthRequest, res) => {
     if (error instanceof Error && error.message === 'Access denied') {
       return res.status(403).json({ error: 'Access denied' });
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -189,7 +189,7 @@ router.post('/:id/members', requireAuth, async (req: AuthRequest, res) => {
     if (error instanceof Error && (error.message === 'Insufficient permissions' || error.message === 'User not found' || error.message === 'User is already a member')) {
       return res.status(400).json({ error: error.message });
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -221,7 +221,7 @@ router.put('/:id/members/:memberId', requireAuth, async (req: AuthRequest, res) 
     if (error instanceof Error && (error.message === 'Insufficient permissions' || error.message === 'Cannot change owner role')) {
       return res.status(400).json({ error: error.message });
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -239,7 +239,7 @@ router.delete('/:id', requireAuth, async (req: AuthRequest, res) => {
     if (error instanceof Error && error.message === 'Organization not found') {
       return res.status(404).json({ error: 'Organization not found' });
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -254,7 +254,7 @@ router.delete('/:id/members/:memberId', requireAuth, async (req: AuthRequest, re
     if (error instanceof Error && (error.message === 'Insufficient permissions' || error.message === 'Cannot remove owner')) {
       return res.status(400).json({ error: error.message });
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 

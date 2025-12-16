@@ -97,7 +97,7 @@ async function handler(req: ApiRequest, res: any) {
     return res.type('text/plain').send(decryptedValue);
   } catch (err) {
     console.error('Public get secret error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 }
 
@@ -177,7 +177,7 @@ async function simpleHandler(req: ApiRequest, res: any) {
     return res.type('text/plain').send(decryptedValue);
   } catch (err) {
     console.error('Simple get secret error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 }
 
@@ -266,7 +266,7 @@ async function shortHandler(req: ApiRequest, res: any) {
     return res.type('text/plain').send(decryptedValue);
   } catch (err) {
     console.error('Short get secret error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 }
 

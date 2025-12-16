@@ -923,8 +923,8 @@ export function LandingPage() {
                   </Link>
                 </li>
                 <li className="pt-2">
-                  <a href="mailto:support@apivault.com" className="text-gray-400 hover:text-emerald-400 transition">
-                    support@apivault.com
+                  <a href="mailto:contact@apivault.it.com" className="text-gray-400 hover:text-emerald-400 transition">
+                    contact@apivault.it.com
                   </a>
                 </li>
               </ul>

@@ -168,10 +168,10 @@ export function DocsPage() {
           </p>
           <div className="flex flex-wrap gap-4">
             <a
-              href="mailto:support@apivault.com"
+              href="mailto:contact@apivault.it.com"
               className="text-emerald-400 hover:text-emerald-300 font-medium text-sm"
             >
-              support@apivault.com →
+              contact@apivault.it.com →
             </a>
             <Link
               to="/contact"

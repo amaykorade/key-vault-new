@@ -136,7 +136,7 @@ router.get('/subscription', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Get subscription error:', error);
     res.status(500).json({
-      error: 'Failed to get subscription',
+      error: 'Something went wrong while loading your subscription. Please try again.',
     });
   }
 });
@@ -197,7 +197,7 @@ router.post('/webhook', async (req, res) => {
   } catch (error) {
     console.error('Webhook error:', error);
     res.status(500).json({
-      error: 'Webhook processing failed',
+      error: 'Something went wrong while processing the payment. Please try again.',
     });
   }
 });

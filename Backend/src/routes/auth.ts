@@ -55,7 +55,7 @@ router.post('/signup', async (req, res) => {
         }))
       });
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -129,7 +129,7 @@ router.post('/login', async (req, res) => {
         }))
       });
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 

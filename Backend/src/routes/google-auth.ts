@@ -36,7 +36,7 @@ router.get('/google/callback',
       res.redirect(`${frontendUrl}/auth/callback?access_token=${accessToken}&refresh_token=${refreshToken}`);
     } catch (error) {
       console.error('Google callback error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
   }
 );

@@ -1,5 +1,6 @@
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import { Strategy as GitHubStrategy } from 'passport-github2';
 import { Strategy as JwtStrategy, ExtractJwt } from 'passport-jwt';
 import { db } from './db';
 import { loadEnv } from '../config/env';
@@ -50,6 +51,70 @@ if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
             create: {
               type: 'oauth',
               provider: 'google',
+              providerAccountId: profile.id,
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            }
+          }
+        },
+        include: { accounts: true }
+      });
+
+      return done(null, user);
+    } catch (error) {
+      return done(error, false);
+    }
+  }));
+}
+
+// GitHub OAuth Strategy
+if (env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET) {
+  passport.use('github', new GitHubStrategy({
+    clientID: env.GITHUB_CLIENT_ID,
+    clientSecret: env.GITHUB_CLIENT_SECRET,
+    callbackURL: env.GITHUB_CALLBACK_URL || 'http://localhost:4000/api/auth/github/callback'
+  }, async (accessToken, refreshToken, profile, done) => {
+    try {
+      // GitHub profile may not have email in profile.emails
+      // We'll use profile.username as fallback and try to get email from profile
+      const email = profile.emails?.[0]?.value || `${profile.username}@users.noreply.github.com`;
+      
+      // Check if user already exists
+      let user = await db.user.findUnique({
+        where: { email },
+        include: { accounts: true }
+      });
+
+      if (user) {
+        // Check if GitHub account is already linked
+        const existingAccount = user.accounts.find(acc => acc.provider === 'github');
+        if (!existingAccount) {
+          // Link GitHub account to existing user
+          await db.account.create({
+            data: {
+              userId: user.id,
+              type: 'oauth',
+              provider: 'github',
+              providerAccountId: profile.id,
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            }
+          });
+        }
+        return done(null, user);
+      }
+
+      // Create new user with GitHub account
+      user = await db.user.create({
+        data: {
+          email,
+          name: profile.displayName || profile.username,
+          image: profile.photos?.[0]?.value,
+          emailVerifiedAt: new Date(),
+          accounts: {
+            create: {
+              type: 'oauth',
+              provider: 'github',
               providerAccountId: profile.id,
               access_token: accessToken,
               refresh_token: refreshToken,
