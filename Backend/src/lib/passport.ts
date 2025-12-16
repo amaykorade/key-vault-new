@@ -13,7 +13,7 @@ if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
     clientID: env.GOOGLE_CLIENT_ID,
     clientSecret: env.GOOGLE_CLIENT_SECRET,
     callbackURL: env.GOOGLE_CALLBACK_URL || 'http://localhost:4000/api/auth/google/callback'
-  }, async (accessToken, refreshToken, profile, done) => {
+  }, async (accessToken: string, refreshToken: string | undefined, profile: any, done: (error: any, user?: any) => void) => {
     try {
       // Check if user already exists
       let user = await db.user.findUnique({
@@ -73,7 +73,7 @@ if (env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET) {
     clientID: env.GITHUB_CLIENT_ID,
     clientSecret: env.GITHUB_CLIENT_SECRET,
     callbackURL: env.GITHUB_CALLBACK_URL || 'http://localhost:4000/api/auth/github/callback'
-  }, async (accessToken, refreshToken, profile, done) => {
+  }, async (accessToken: string, refreshToken: string | undefined, profile: any, done: (error: any, user?: any) => void) => {
     try {
       // GitHub profile may not have email in profile.emails
       // We'll use profile.username as fallback and try to get email from profile

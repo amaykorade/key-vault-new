@@ -46,7 +46,7 @@ router.get('/github/callback', (req, res, next) => {
       error: 'GitHub OAuth is not configured. Please set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET environment variables.' 
     });
   }
-  passport.authenticate('github', { session: false })(req, res, async (err) => {
+  passport.authenticate('github', { session: false })(req, res, async (err: any) => {
     if (err) {
       return res.status(401).json({ error: 'GitHub authentication failed' });
     }
